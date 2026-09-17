@@ -3,6 +3,7 @@ using CrossLedgerWeb.Application.Payments;
 using CrossLedgerWeb.Domain.ValueObjects;
 using CrossLedgerWeb.Infrastructure.Persistence;
 using CrossLedgerWeb.Infrastructure.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace CrossLedgerWeb.Infrastructure.Repositories;
 
@@ -41,5 +42,18 @@ public sealed class RoutingAuditLog : IRoutingAuditLog
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<RoutingDecisionEntry>> GetByTransferIdAsync(TransferId transferId, CancellationToken cancellationToken)
+    {
+        var records = await _db.RoutingDecisions
+            .Where(r => r.TransferId == transferId.Value)
+            .OrderBy(r => r.Rank)
+            .ToListAsync(cancellationToken);
+
+        return records
+            .Select(r => new RoutingDecisionEntry(
+                r.ProviderCode, r.Rank, r.Score, new Money(r.FeeAmount, Currency.From(r.FeeCurrency)), r.EstimatedSettlementMinutes, r.RecordedAt))
+            .ToList();
     }
 }
