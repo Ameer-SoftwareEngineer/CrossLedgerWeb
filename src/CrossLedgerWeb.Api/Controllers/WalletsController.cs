@@ -1,3 +1,4 @@
+using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Application.Wallets;
 using CrossLedgerWeb.Domain.ValueObjects;
@@ -37,5 +38,23 @@ public sealed class WalletsController : ControllerBase
         var balance = await _mediator.Send(new GetWalletBalanceQuery(new WalletId(walletId)), cancellationToken);
 
         return Ok(new WalletBalanceResponse(walletId, balance.Amount, balance.Currency.Code));
+    }
+
+    /// <summary>Backs the Wallet Dashboard (specification 9) - every wallet the caller
+    /// owns, with its derived balance, in one call.</summary>
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<WalletSummaryResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<WalletSummaryResponse>>> GetMine(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var wallets = await _mediator.Send(new ListMyWalletsQuery(userId), cancellationToken);
+
+        var response = wallets
+            .Select(w => new WalletSummaryResponse(w.WalletId.Value, w.Currency.Code, w.Balance.Amount))
+            .ToList();
+
+        return Ok(response);
     }
 }
