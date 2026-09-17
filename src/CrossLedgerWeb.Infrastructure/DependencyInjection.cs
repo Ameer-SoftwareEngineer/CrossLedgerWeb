@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IRoutingAuditLog, RoutingAuditLog>();
         services.AddScoped<IProviderStatsProvider, DefaultProviderStatsProvider>();
         services.AddScoped<ITransactionHistoryReader, TransactionHistoryReader>();
+        services.AddScoped<ILedgerEntryReader, LedgerEntryReader>();
         services.AddSingleton<IClock, SystemClock>();
 
         // CrossLedgerWebDbContext needs IDataProtectionProvider to encrypt TOTP secrets at
