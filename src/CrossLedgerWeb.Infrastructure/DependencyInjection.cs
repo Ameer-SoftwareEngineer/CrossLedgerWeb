@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IStepUpTokenValidator, StepUpTokenValidator>();
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         services.AddScoped<ITotpProvider, TotpProvider>();

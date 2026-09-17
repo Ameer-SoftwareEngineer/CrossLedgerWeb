@@ -34,6 +34,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         {
             WalletNotFoundException => (StatusCodes.Status404NotFound, "Wallet not found", "WALLET_NOT_FOUND"),
             TransferNotFoundException => (StatusCodes.Status404NotFound, "Transfer not found", "TRANSFER_NOT_FOUND"),
+            UserNotFoundException => (StatusCodes.Status404NotFound, "User not found", "USER_NOT_FOUND"),
             QuoteNotFoundException => (StatusCodes.Status404NotFound, "Quote not found", "QUOTE_NOT_FOUND"),
             QuoteExpiredException => (StatusCodes.Status409Conflict, "Quote expired", "QUOTE_EXPIRED"),
             InsufficientFundsException => (StatusCodes.Status409Conflict, "Insufficient funds", "INSUFFICIENT_FUNDS"),
