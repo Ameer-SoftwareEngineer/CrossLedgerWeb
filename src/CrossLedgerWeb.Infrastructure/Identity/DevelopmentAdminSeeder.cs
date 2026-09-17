@@ -26,7 +26,14 @@ public static class DevelopmentAdminSeeder
                 return;
         }
 
-        if (!await userManager.IsInRoleAsync(user, Roles.Admin))
-            await userManager.AddToRoleAsync(user, Roles.Admin);
+        // Also Customer, not just Admin - otherwise this account 403s on every
+        // Customer-only page (Wallets, Send Money, ...) the moment it lands on Home
+        // after logging in, which has nothing to do with proving RBAC and is just
+        // friction for whoever uses this seeded account to explore the app.
+        foreach (var role in new[] { Roles.Admin, Roles.Customer })
+        {
+            if (!await userManager.IsInRoleAsync(user, role))
+                await userManager.AddToRoleAsync(user, role);
+        }
     }
 }
