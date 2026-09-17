@@ -57,4 +57,43 @@ public sealed class WalletsController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>Backs the Transaction History screen (specification 9) - server-side
+    /// paged over dbo.usp_GetTransactionHistory (specification 4.1). 404s for a wallet
+    /// that exists but belongs to someone else, same as for one that doesn't exist at
+    /// all, so this can never be used to probe another user's wallet ids.</summary>
+    [HttpGet("{walletId:guid}/transactions")]
+    [ProducesResponseType<TransactionHistoryPageResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TransactionHistoryPageResponse>> GetTransactions(
+        Guid walletId,
+        [FromQuery] int pageNumber,
+        [FromQuery] int pageSize,
+        [FromQuery] DateTimeOffset? fromDate,
+        [FromQuery] DateTimeOffset? toDate,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var page = await _mediator.Send(
+            new GetTransactionHistoryQuery(
+                new WalletId(walletId),
+                userId,
+                pageNumber <= 0 ? 1 : pageNumber,
+                pageSize <= 0 ? 20 : pageSize,
+                fromDate,
+                toDate),
+            cancellationToken);
+
+        var response = new TransactionHistoryPageResponse(
+            page.Entries
+                .Select(e => new TransactionHistoryEntryResponse(
+                    e.Id.Value, e.TransferId.Value, e.Direction.ToString(), e.Amount.Amount, e.Amount.Currency.Code, e.SignedAmount.Amount, e.PostedAt))
+                .ToList(),
+            page.TotalCount,
+            page.PageNumber,
+            page.PageSize);
+
+        return Ok(response);
+    }
 }

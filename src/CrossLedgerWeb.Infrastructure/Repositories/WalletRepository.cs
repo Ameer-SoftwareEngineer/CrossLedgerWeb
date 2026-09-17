@@ -21,5 +21,15 @@ public sealed class WalletRepository : IWalletRepository
     public async Task<IReadOnlyList<Wallet>> ListByOwnerAsync(UserId ownerId, CancellationToken cancellationToken) =>
         await _db.Wallets.Include(w => w.Entries).Where(w => w.OwnerId == ownerId).ToListAsync(cancellationToken);
 
+    public async Task<UserId?> GetOwnerIdAsync(WalletId id, CancellationToken cancellationToken)
+    {
+        var match = await _db.Wallets.AsNoTracking()
+            .Where(w => w.Id == id)
+            .Select(w => new { w.OwnerId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return match?.OwnerId;
+    }
+
     public void Add(Wallet wallet) => _db.Wallets.Add(wallet);
 }

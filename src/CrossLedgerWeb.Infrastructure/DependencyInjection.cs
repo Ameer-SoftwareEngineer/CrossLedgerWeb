@@ -3,6 +3,7 @@ using CrossLedgerWeb.Application.Payments;
 using CrossLedgerWeb.Infrastructure.Fx;
 using CrossLedgerWeb.Infrastructure.Identity;
 using CrossLedgerWeb.Infrastructure.Persistence;
+using CrossLedgerWeb.Infrastructure.Reporting;
 using CrossLedgerWeb.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IRoutingAuditLog, RoutingAuditLog>();
         services.AddScoped<IProviderStatsProvider, DefaultProviderStatsProvider>();
+        services.AddScoped<ITransactionHistoryReader, TransactionHistoryReader>();
         services.AddSingleton<IClock, SystemClock>();
 
         // CrossLedgerWebDbContext needs IDataProtectionProvider to encrypt TOTP secrets at
