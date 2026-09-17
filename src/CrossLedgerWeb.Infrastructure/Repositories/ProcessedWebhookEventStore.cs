@@ -1,4 +1,5 @@
 using CrossLedgerWeb.Application.Abstractions;
+using CrossLedgerWeb.Application.Admin;
 using CrossLedgerWeb.Domain.Payments;
 using CrossLedgerWeb.Infrastructure.Persistence;
 using CrossLedgerWeb.Infrastructure.Persistence.Models;
@@ -27,4 +28,18 @@ public sealed class ProcessedWebhookEventStore : IProcessedWebhookEventStore
             EventId = eventId,
             ProcessedAt = processedAt,
         });
+
+    public async Task<WebhookEventPage> ListRecentAsync(int pageNumber, int pageSize, CancellationToken cancellationToken)
+    {
+        var query = _db.ProcessedWebhookEvents.OrderByDescending(e => e.ProcessedAt);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var page = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => new WebhookEventSummary(e.ProviderCode, e.EventId, e.ProcessedAt))
+            .ToListAsync(cancellationToken);
+
+        return new WebhookEventPage(page, totalCount, pageNumber, pageSize);
+    }
 }

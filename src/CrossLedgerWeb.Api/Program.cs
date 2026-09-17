@@ -156,6 +156,15 @@ using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
     await IdentityRoleSeeder.SeedRolesAsync(roleManager);
+
+    // Nothing else in this codebase ever grants Admin/Support - every self-registration
+    // hardcodes Customer - so without this the Admin Console (specification 9) would have
+    // no way to be exercised locally short of a manual database edit.
+    if (app.Environment.IsDevelopment())
+    {
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        await DevelopmentAdminSeeder.SeedAsync(userManager);
+    }
 }
 
 app.Run();
