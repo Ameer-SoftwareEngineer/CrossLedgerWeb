@@ -43,6 +43,18 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddPaymentProviders(builder.Configuration);
 
+// CrossLedgerFrontend runs on its own origin (a separate repo, a separate dev server
+// port) - without this, the browser blocks every call the Blazor WASM app makes here.
+const string FrontendCorsPolicy = "Frontend";
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(FrontendCorsPolicy, policy =>
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -102,6 +114,8 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
+
+app.UseCors(FrontendCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
