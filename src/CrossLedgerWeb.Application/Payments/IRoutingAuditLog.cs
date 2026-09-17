@@ -8,4 +8,6 @@ namespace CrossLedgerWeb.Application.Payments;
 public interface IRoutingAuditLog
 {
     Task RecordAsync(TransferId transferId, IReadOnlyList<ScoredProviderQuote> rankedQuotes, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<RoutingDecisionEntry>> GetByTransferIdAsync(TransferId transferId, CancellationToken cancellationToken);
 }
