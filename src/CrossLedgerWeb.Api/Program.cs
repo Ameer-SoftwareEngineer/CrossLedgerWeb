@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
 using CrossLedgerWeb.Api.ExceptionHandling;
+using CrossLedgerWeb.Api.RealTime;
 using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application;
 using CrossLedgerWeb.Infrastructure;
@@ -43,8 +44,14 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddPaymentProviders(builder.Configuration);
 
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<FxRateBroadcastService>();
+
 // CrossLedgerFrontend runs on its own origin (a separate repo, a separate dev server
 // port) - without this, the browser blocks every call the Blazor WASM app makes here.
+// AllowCredentials is here for the SignalR hub specifically - its client negotiates with
+// credentials included, which the CORS spec refuses to combine with a wildcard origin, so
+// this policy has always needed WithOrigins over AllowAnyOrigin regardless.
 const string FrontendCorsPolicy = "Frontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -52,7 +59,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy(FrontendCorsPolicy, policy =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
@@ -74,6 +82,22 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["SigningKey"] ?? string.Empty)),
             ClockSkew = TimeSpan.FromSeconds(30),
+        };
+
+        // Browsers can't attach an Authorization header to a WebSocket handshake, so the
+        // SignalR client instead puts the access token on the query string - this is the
+        // one place that's accepted from, and only for the hub path, so it can't be used
+        // to bypass the header requirement on ordinary API calls.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+
+                return Task.CompletedTask;
+            },
         };
     });
 builder.Services.AddAuthorization();
@@ -122,6 +146,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+
+app.MapHub<FxRateHub>("/hubs/fx-rates");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
