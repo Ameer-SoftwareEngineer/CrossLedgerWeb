@@ -24,7 +24,7 @@ public class RefreshAccessTokenCommandHandlerTests
     {
         _clock.Setup(x => x.UtcNow).Returns(Now);
         _identity.Setup(x => x.GetProfileAsync(User, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserProfile(User, "user@example.com", ["Customer"]));
+            .ReturnsAsync(new UserProfile(User, "user@example.com", ["Customer"], RegistrationStatus.Approved));
         _jwt.Setup(x => x.GenerateAccessToken(User, "user@example.com", It.IsAny<IReadOnlyList<string>>()))
             .Returns(new AccessToken("new-jwt", Now.AddMinutes(15)));
     }

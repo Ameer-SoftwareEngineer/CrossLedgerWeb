@@ -10,7 +10,7 @@ namespace CrossLedgerWeb.Application.Abstractions;
 /// </summary>
 public interface IIdentityService
 {
-    Task<RegistrationOutcome> RegisterAsync(string email, string password, CancellationToken cancellationToken);
+    Task<RegistrationOutcome> RegisterAsync(RegistrationDetails details, CancellationToken cancellationToken);
 
     Task<CredentialValidationOutcome> ValidateCredentialsAsync(string email, string password, CancellationToken cancellationToken);
 

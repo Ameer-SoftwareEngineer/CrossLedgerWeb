@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Auth;
+using CrossLedgerWeb.Domain.Auth;
 using CrossLedgerWeb.Domain.ValueObjects;
 using Microsoft.AspNetCore.Identity;
 
@@ -16,10 +17,29 @@ public sealed class IdentityService : IIdentityService
         _signInManager = signInManager;
     }
 
-    public async Task<RegistrationOutcome> RegisterAsync(string email, string password, CancellationToken cancellationToken)
+    public async Task<RegistrationOutcome> RegisterAsync(RegistrationDetails details, CancellationToken cancellationToken)
     {
-        var user = new ApplicationUser { UserName = email, Email = email };
-        var result = await _userManager.CreateAsync(user, password);
+        var user = new ApplicationUser
+        {
+            UserName = details.Email,
+            Email = details.Email,
+            PhoneNumber = details.PhoneNumber,
+            FullName = details.FullName,
+            DateOfBirth = details.DateOfBirth,
+            Address = details.Address,
+            PermanentAddress = details.PermanentAddress,
+            City = details.City,
+            StateProvince = details.StateProvince,
+            Country = details.Country,
+            RegistrationStatus = RegistrationStatus.Pending,
+            RegistrationSubmittedAt = DateTimeOffset.UtcNow,
+            ProofOfAddressDocumentType = details.ProofOfAddressDocumentType,
+            ProofOfAddressFileName = details.ProofOfAddressFileName,
+            ProofOfAddressContentType = details.ProofOfAddressContentType,
+            ProofOfAddressContent = details.ProofOfAddressContent,
+        };
+
+        var result = await _userManager.CreateAsync(user, details.Password);
 
         if (!result.Succeeded)
             return RegistrationOutcome.Failure(result.Errors.Select(e => e.Description).ToList());
@@ -55,6 +75,6 @@ public sealed class IdentityService : IIdentityService
 
         var roles = await _userManager.GetRolesAsync(user);
 
-        return new UserProfile(userId, user.Email!, roles.ToList());
+        return new UserProfile(userId, user.Email!, roles.ToList(), user.RegistrationStatus);
     }
 }

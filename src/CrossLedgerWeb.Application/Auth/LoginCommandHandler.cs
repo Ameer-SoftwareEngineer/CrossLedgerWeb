@@ -44,6 +44,14 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
         var profile = await _identity.GetProfileAsync(userId, cancellationToken)
             ?? throw new InvalidCredentialsException();
 
+        // Credentials alone aren't enough - specification 9's Admin Console review must
+        // clear the account before it can ever receive a token.
+        if (profile.RegistrationStatus == RegistrationStatus.Pending)
+            throw new AccountPendingApprovalException();
+
+        if (profile.RegistrationStatus == RegistrationStatus.Rejected)
+            throw new AccountRegistrationRejectedException();
+
         var accessToken = _jwtTokenGenerator.GenerateAccessToken(userId, profile.Email, profile.Roles);
 
         var now = _clock.UtcNow;

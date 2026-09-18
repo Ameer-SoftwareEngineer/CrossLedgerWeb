@@ -1,11 +1,10 @@
 using CrossLedgerWeb.Domain.ValueObjects;
-using MediatR;
 
-namespace CrossLedgerWeb.Application.Auth;
+namespace CrossLedgerWeb.Application.Admin;
 
-public sealed record RegisterCommand(
+public sealed record PendingRegistration(
+    UserId Id,
     string Email,
-    string Password,
     string FullName,
     string PhoneNumber,
     DateOnly DateOfBirth,
@@ -16,7 +15,4 @@ public sealed record RegisterCommand(
     string Country,
     string ProofOfAddressDocumentType,
     string ProofOfAddressFileName,
-    string ProofOfAddressContentType,
-    byte[] ProofOfAddressContent) : IRequest<RegisterResult>;
-
-public sealed record RegisterResult(UserId UserId, string Email);
+    DateTimeOffset SubmittedAt);

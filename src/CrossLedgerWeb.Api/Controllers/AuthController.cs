@@ -1,3 +1,4 @@
+using CrossLedgerWeb.Api.Models;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Shared.Auth;
 using MediatR;
@@ -18,9 +19,34 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("register")]
     [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<RegisterResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<RegisterResponse>> Register([FromForm] RegisterFormRequest request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new RegisterCommand(request.Email, request.Password), cancellationToken);
+        var documentContent = Array.Empty<byte>();
+        if (request.ProofOfAddress is { Length: > 0 } document)
+        {
+            await using var stream = new MemoryStream();
+            await document.CopyToAsync(stream, cancellationToken);
+            documentContent = stream.ToArray();
+        }
+
+        var command = new RegisterCommand(
+            request.Email,
+            request.Password,
+            request.FullName,
+            request.PhoneNumber,
+            request.DateOfBirth,
+            request.Address,
+            request.PermanentAddress,
+            request.City,
+            request.StateProvince,
+            request.Country,
+            request.ProofOfAddressDocumentType,
+            request.ProofOfAddress?.FileName ?? string.Empty,
+            request.ProofOfAddress?.ContentType ?? string.Empty,
+            documentContent);
+
+        var result = await _mediator.Send(command, cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, new RegisterResponse(result.UserId.Value, result.Email));
     }

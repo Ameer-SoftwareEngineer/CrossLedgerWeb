@@ -15,7 +15,23 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
 
     public async Task<RegisterResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
-        var outcome = await _identity.RegisterAsync(request.Email, request.Password, cancellationToken);
+        var details = new RegistrationDetails(
+            request.Email,
+            request.Password,
+            request.FullName,
+            request.PhoneNumber,
+            request.DateOfBirth,
+            request.Address,
+            request.PermanentAddress,
+            request.City,
+            request.StateProvince,
+            request.Country,
+            request.ProofOfAddressDocumentType,
+            request.ProofOfAddressFileName,
+            request.ProofOfAddressContentType,
+            request.ProofOfAddressContent);
+
+        var outcome = await _identity.RegisterAsync(details, cancellationToken);
 
         if (!outcome.Succeeded)
             throw new RegistrationFailedException(outcome.Errors);

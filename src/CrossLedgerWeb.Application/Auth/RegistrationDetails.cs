@@ -1,9 +1,9 @@
-using CrossLedgerWeb.Domain.ValueObjects;
-using MediatR;
-
 namespace CrossLedgerWeb.Application.Auth;
 
-public sealed record RegisterCommand(
+/// <summary>Everything IdentityService needs to create both the login credentials and the
+/// KYC profile in one CreateAsync call - kept as plain values (not the Api layer's
+/// IFormFile) so Application never depends on ASP.NET Core's HTTP model binding types.</summary>
+public sealed record RegistrationDetails(
     string Email,
     string Password,
     string FullName,
@@ -17,6 +17,4 @@ public sealed record RegisterCommand(
     string ProofOfAddressDocumentType,
     string ProofOfAddressFileName,
     string ProofOfAddressContentType,
-    byte[] ProofOfAddressContent) : IRequest<RegisterResult>;
-
-public sealed record RegisterResult(UserId UserId, string Email);
+    byte[] ProofOfAddressContent);

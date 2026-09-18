@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Admin;
+using CrossLedgerWeb.Domain.Auth;
 using CrossLedgerWeb.Domain.ValueObjects;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -47,5 +48,61 @@ public sealed class UserAdminService : IUserAdminService
             await _userManager.RemoveFromRolesAsync(user, toRemove);
 
         return true;
+    }
+
+    public async Task<IReadOnlyList<PendingRegistration>> ListPendingRegistrationsAsync(CancellationToken cancellationToken)
+    {
+        var users = await _userManager.Users
+            .Where(u => u.RegistrationStatus == RegistrationStatus.Pending)
+            .OrderBy(u => u.RegistrationSubmittedAt)
+            .ToListAsync(cancellationToken);
+
+        return users
+            .Select(u => new PendingRegistration(
+                new UserId(u.Id),
+                u.Email!,
+                u.FullName,
+                u.PhoneNumber ?? string.Empty,
+                u.DateOfBirth,
+                u.Address,
+                u.PermanentAddress,
+                u.City,
+                u.StateProvince,
+                u.Country,
+                u.ProofOfAddressDocumentType,
+                u.ProofOfAddressFileName,
+                u.RegistrationSubmittedAt))
+            .ToList();
+    }
+
+    public async Task<bool> ApproveRegistrationAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+        if (user is null)
+            return false;
+
+        user.RegistrationStatus = RegistrationStatus.Approved;
+        await _userManager.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> RejectRegistrationAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+        if (user is null)
+            return false;
+
+        user.RegistrationStatus = RegistrationStatus.Rejected;
+        await _userManager.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<KycDocument?> GetKycDocumentAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+        if (user is null || user.ProofOfAddressContent.Length == 0)
+            return null;
+
+        return new KycDocument(user.ProofOfAddressFileName, user.ProofOfAddressContentType, user.ProofOfAddressContent);
     }
 }
