@@ -13,4 +13,10 @@ public interface IJwtTokenGenerator
     /// operation class - a step-up token minted for a transfer can't be reused to
     /// authorize disabling two-factor auth.</summary>
     AccessToken GenerateStepUpToken(UserId userId, StepUpOperation operation);
+
+    /// <summary>Identifies the user through the login 2FA step without granting API
+    /// access - it carries no email/role claims, so it's useless as a bearer token even
+    /// if it leaked. Validated by ITwoFactorChallengeTokenValidator, never by the normal
+    /// [Authorize] pipeline.</summary>
+    AccessToken GenerateTwoFactorChallengeToken(UserId userId);
 }

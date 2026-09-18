@@ -1,4 +1,5 @@
 using System.Reflection;
+using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Application.Behaviors;
 using CrossLedgerWeb.Application.Payments;
 using FluentValidation;
@@ -30,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IProviderQuoteScorer, ProviderQuoteScorer>();
         services.AddScoped<PaymentRoutingEngine>();
+        services.AddScoped<ILoginTokenIssuer, LoginTokenIssuer>();
 
         return services;
     }

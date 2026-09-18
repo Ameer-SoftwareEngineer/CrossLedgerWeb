@@ -12,8 +12,10 @@ namespace CrossLedgerWeb.Infrastructure.Identity;
 public sealed class JwtTokenGenerator : IJwtTokenGenerator
 {
     public const string StepUpOperationClaimType = "step_up_operation";
+    public const string TwoFactorChallengeClaimType = "two_factor_challenge";
 
     private static readonly TimeSpan StepUpTokenLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan TwoFactorChallengeTokenLifetime = TimeSpan.FromMinutes(10);
 
     private readonly IOptions<JwtOptions> _options;
     private readonly IClock _clock;
@@ -43,6 +45,16 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         };
 
         return BuildToken(userId, claims, StepUpTokenLifetime);
+    }
+
+    public AccessToken GenerateTwoFactorChallengeToken(UserId userId)
+    {
+        var claims = new List<Claim>
+        {
+            new(TwoFactorChallengeClaimType, "true"),
+        };
+
+        return BuildToken(userId, claims, TwoFactorChallengeTokenLifetime);
     }
 
     private AccessToken BuildToken(UserId userId, IReadOnlyList<Claim> additionalClaims, TimeSpan lifetime)

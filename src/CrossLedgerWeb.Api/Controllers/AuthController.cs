@@ -51,13 +51,17 @@ public sealed class AuthController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, new RegisterResponse(result.UserId.Value, result.Email));
     }
 
+    /// <summary>Credentials alone never return a token pair any more - 2FA is
+    /// mandatory (specification 9), so this always returns a short-lived challenge that
+    /// TwoFactorController's login/* endpoints consume to actually finish signing in.</summary>
     [HttpPost("login")]
-    [ProducesResponseType<TokenResponse>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<TokenResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType<LoginChallengeResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<LoginChallengeResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(new LoginCommand(request.Email, request.Password), cancellationToken);
 
-        return Ok(ToResponse(result));
+        return Ok(new LoginChallengeResponse(
+            result.ChallengeToken, result.ChallengeExpiresAt, result.RequiresSetup, result.AvailableMethods, result.MaskedPhoneNumber));
     }
 
     [HttpPost("refresh")]

@@ -5,6 +5,7 @@ using CrossLedgerWeb.Api.ExceptionHandling;
 using CrossLedgerWeb.Api.RealTime;
 using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application;
+using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Infrastructure;
 using CrossLedgerWeb.Infrastructure.Identity;
 using CrossLedgerWeb.Providers;
@@ -163,7 +164,9 @@ using (var scope = app.Services.CreateScope())
     if (app.Environment.IsDevelopment())
     {
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        await DevelopmentAdminSeeder.SeedAsync(userManager);
+        var twoFactorCredentials = scope.ServiceProvider.GetRequiredService<ITwoFactorCredentialRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        await DevelopmentAdminSeeder.SeedAsync(userManager, twoFactorCredentials, unitOfWork);
     }
 }
 

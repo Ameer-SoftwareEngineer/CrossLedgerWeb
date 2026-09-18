@@ -93,4 +93,55 @@ public sealed class TwoFactorController : ControllerBase
 
         return NoContent();
     }
+
+    // ---- Login 2FA (specification 9) - the caller has no access token yet at this
+    // point, only the challenge token LoginChallengeResponse gave it, so every action
+    // below is [AllowAnonymous] and identifies the user through that token instead. ----
+
+    [HttpPost("login/send-sms")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimiterPolicies.TotpVerification)]
+    public async Task<IActionResult> SendLoginSms(SendLoginSmsCodeRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new SendLoginSmsCodeCommand(request.ChallengeToken), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("login/verify")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimiterPolicies.TotpVerification)]
+    [ProducesResponseType<TokenResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TokenResponse>> VerifyLogin(VerifyTwoFactorLoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(
+            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Method, request.Code), cancellationToken);
+
+        return Ok(ToTokenResponse(result));
+    }
+
+    [HttpPost("login/totp/begin")]
+    [AllowAnonymous]
+    [ProducesResponseType<BeginTotpEnrollmentResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<BeginTotpEnrollmentResponse>> BeginLoginTotpSetup(
+        BeginTwoFactorLoginTotpSetupRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new BeginTwoFactorLoginTotpSetupCommand(request.ChallengeToken), cancellationToken);
+        return Ok(new BeginTotpEnrollmentResponse(result.Secret, result.QrCodeUri));
+    }
+
+    [HttpPost("login/totp/confirm")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimiterPolicies.TotpVerification)]
+    [ProducesResponseType<TwoFactorLoginSetupResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TwoFactorLoginSetupResponse>> ConfirmLoginTotpSetup(
+        ConfirmTwoFactorLoginTotpSetupRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(
+            new ConfirmTwoFactorLoginTotpSetupCommand(request.ChallengeToken, request.Secret, request.Code), cancellationToken);
+
+        return Ok(new TwoFactorLoginSetupResponse(ToTokenResponse(result.Tokens), result.RecoveryCodes));
+    }
+
+    private static TokenResponse ToTokenResponse(LoginResult result) =>
+        new(result.AccessToken, result.AccessTokenExpiresAt, result.RefreshToken, result.RefreshTokenExpiresAt);
 }
