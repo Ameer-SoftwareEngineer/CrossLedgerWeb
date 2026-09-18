@@ -53,6 +53,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             TotpCodeReplayedException => (StatusCodes.Status401Unauthorized, "Authenticator code already used", "TOTP_CODE_REPLAYED"),
             InvalidTwoFactorChallengeException => (StatusCodes.Status401Unauthorized, "Invalid verification session", "INVALID_TWO_FACTOR_CHALLENGE"),
             InvalidTwoFactorCodeException => (StatusCodes.Status401Unauthorized, "Invalid verification code", "INVALID_TWO_FACTOR_CODE"),
+            InvalidPasswordResetException => (StatusCodes.Status400BadRequest, "Invalid password reset", "INVALID_PASSWORD_RESET"),
             RecoveryCodeAlreadyUsedException => (StatusCodes.Status409Conflict, "Recovery code already used", "RECOVERY_CODE_ALREADY_USED"),
             PayoutNotFoundException => (StatusCodes.Status404NotFound, "Payout not found", "PAYOUT_NOT_FOUND"),
             NoRouteAvailableException => (StatusCodes.Status503ServiceUnavailable, "No provider can serve this corridor", "NO_ROUTE_AVAILABLE"),

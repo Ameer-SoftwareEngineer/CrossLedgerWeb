@@ -40,7 +40,9 @@ public class RegisterCommandHandlerTests
     private static RegisterCommand ValidCommand() => new(
         "user@example.com",
         "password123",
-        "Jane Doe",
+        "Jane",
+        null,
+        "Doe",
         "+15551234567",
         new DateOnly(1990, 1, 1),
         "123 Main St",

@@ -12,12 +12,18 @@ public sealed class IdentityService : IIdentityService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ISmsSender _smsSender;
+    private readonly IEmailSender _emailSender;
 
-    public IdentityService(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ISmsSender smsSender)
+    public IdentityService(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        ISmsSender smsSender,
+        IEmailSender emailSender)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _smsSender = smsSender;
+        _emailSender = emailSender;
     }
 
     public async Task<RegistrationOutcome> RegisterAsync(RegistrationDetails details, CancellationToken cancellationToken)
@@ -27,7 +33,9 @@ public sealed class IdentityService : IIdentityService
             UserName = details.Email,
             Email = details.Email,
             PhoneNumber = details.PhoneNumber,
-            FullName = details.FullName,
+            FirstName = details.FirstName,
+            MiddleName = details.MiddleName,
+            LastName = details.LastName,
             DateOfBirth = details.DateOfBirth,
             Address = details.Address,
             PermanentAddress = details.PermanentAddress,
@@ -81,6 +89,18 @@ public sealed class IdentityService : IIdentityService
         return new UserProfile(userId, user.Email!, roles.ToList(), user.RegistrationStatus);
     }
 
+    public async Task<MyProfile?> GetMyProfileAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+        if (user is null)
+            return null;
+
+        return new MyProfile(
+            userId, user.Email!, user.FirstName, user.MiddleName, user.LastName, user.PhoneNumber ?? string.Empty,
+            user.DateOfBirth, user.Address, user.PermanentAddress, user.City, user.StateProvince, user.Country,
+            user.RegistrationStatus);
+    }
+
     public async Task<TwoFactorPhoneStatus> GetTwoFactorPhoneStatusAsync(UserId userId, CancellationToken cancellationToken)
     {
         var user = await _userManager.FindByIdAsync(userId.Value.ToString());
@@ -117,6 +137,41 @@ public sealed class IdentityService : IIdentityService
 
         return true;
     }
+
+    /// <summary>Deliberately silent if the email doesn't match an account - the caller
+    /// (RequestPasswordResetCommandHandler) always reports success either way, so this
+    /// never becomes an account-enumeration oracle.</summary>
+    public async Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+            return;
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = Uri.EscapeDataString(token);
+        var resetLink = $"{AppBaseUrl}/reset-password?email={Uri.EscapeDataString(email)}&token={encodedToken}";
+
+        await _emailSender.SendAsync(
+            email,
+            "Reset your CrossLedger password",
+            $"Use this link to reset your password: {resetLink}",
+            cancellationToken);
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, string token, string newPassword, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+            return false;
+
+        var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+        return result.Succeeded;
+    }
+
+    // No hosted frontend origin is configured anywhere in this project (it's a separate
+    // repo/deployment) - hardcoded to the known local dev port, same spirit as
+    // DevelopmentAdminSeeder's well-known dev-only values.
+    private const string AppBaseUrl = "http://localhost:5180";
 
     private static string? MaskPhoneNumber(string? phoneNumber)
     {

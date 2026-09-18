@@ -1,8 +1,10 @@
 using CrossLedgerWeb.Api.Models;
+using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Shared.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CrossLedgerWeb.Api.Controllers;
 
@@ -33,7 +35,9 @@ public sealed class AuthController : ControllerBase
         var command = new RegisterCommand(
             request.Email,
             request.Password,
-            request.FullName,
+            request.FirstName,
+            request.MiddleName,
+            request.LastName,
             request.PhoneNumber,
             request.DateOfBirth,
             request.Address,
@@ -71,6 +75,24 @@ public sealed class AuthController : ControllerBase
         var result = await _mediator.Send(new RefreshAccessTokenCommand(request.RefreshToken), cancellationToken);
 
         return Ok(ToResponse(result));
+    }
+
+    /// <summary>Always 204, whether or not the email matches an account - the response
+    /// itself must never be an oracle for account enumeration (specification 6.1).</summary>
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimiterPolicies.TotpVerification)]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RequestPasswordResetCommand(request.Email), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimiterPolicies.TotpVerification)]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new ResetPasswordCommand(request.Email, request.Token, request.NewPassword), cancellationToken);
+        return NoContent();
     }
 
     private static TokenResponse ToResponse(LoginResult result) =>

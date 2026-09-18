@@ -5,7 +5,9 @@ namespace CrossLedgerWeb.Application.Admin;
 public sealed record PendingRegistration(
     UserId Id,
     string Email,
-    string FullName,
+    string FirstName,
+    string? MiddleName,
+    string LastName,
     string PhoneNumber,
     DateOnly DateOfBirth,
     string Address,

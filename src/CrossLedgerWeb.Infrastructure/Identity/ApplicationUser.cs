@@ -13,7 +13,9 @@ namespace CrossLedgerWeb.Infrastructure.Identity;
 /// no history of edits, so it lives on this row rather than a separate aggregate.</summary>
 public sealed class ApplicationUser : IdentityUser<Guid>
 {
-    public string FullName { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string? MiddleName { get; set; }
+    public string LastName { get; set; } = string.Empty;
     public DateOnly DateOfBirth { get; set; }
     public string Address { get; set; } = string.Empty;
     public string PermanentAddress { get; set; } = string.Empty;
@@ -28,4 +30,11 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public string ProofOfAddressFileName { get; set; } = string.Empty;
     public string ProofOfAddressContentType { get; set; } = string.Empty;
     public byte[] ProofOfAddressContent { get; set; } = [];
+
+    /// <summary>Read-only, so EF Core's default conventions never try to map it as a
+    /// column - display-only convenience for the places (admin review, snackbars) that
+    /// want "the name" rather than its parts.</summary>
+    public string FullName => string.IsNullOrWhiteSpace(MiddleName)
+        ? $"{FirstName} {LastName}"
+        : $"{FirstName} {MiddleName} {LastName}";
 }

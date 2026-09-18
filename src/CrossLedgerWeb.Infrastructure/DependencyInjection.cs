@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IRecoveryCodeRepository, RecoveryCodeRepository>();
         services.AddScoped<IUsedTotpCodeRepository, UsedTotpCodeRepository>();
         services.AddScoped<ISmsSender, DevLogSmsSender>();
+        services.AddScoped<IEmailSender, DevLogEmailSender>();
     }
 
     private static void AddExchangeRateProviders(IServiceCollection services, IConfiguration configuration)

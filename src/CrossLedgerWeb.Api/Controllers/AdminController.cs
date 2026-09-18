@@ -52,7 +52,7 @@ public sealed class AdminController : ControllerBase
 
         var response = pending
             .Select(p => new PendingRegistrationResponse(
-                p.Id.Value, p.Email, p.FullName, p.PhoneNumber, p.DateOfBirth, p.Address, p.PermanentAddress,
+                p.Id.Value, p.Email, p.FirstName, p.MiddleName, p.LastName, p.PhoneNumber, p.DateOfBirth, p.Address, p.PermanentAddress,
                 p.City, p.StateProvince, p.Country, p.ProofOfAddressDocumentType, p.ProofOfAddressFileName, p.SubmittedAt))
             .ToList();
 
