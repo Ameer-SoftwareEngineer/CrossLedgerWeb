@@ -1,36 +1,33 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
-using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
 
 namespace CrossLedgerWeb.Application.Auth;
 
-/// <summary>Issues the token pair from specification 6.4: a short-lived access token
-/// plus a rotating refresh token. The raw refresh token is returned to the caller once
-/// and never again - only its hash is persisted (see RefreshTokenGenerator).</summary>
-public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
+/// <summary>Validates credentials and mints the short-lived challenge that starts the
+/// mandatory login 2FA step (specification 9) - never issues a real token pair itself
+/// any more. See LoginTokenIssuer for the handlers that do (VerifyTwoFactorLoginCommand,
+/// SendLoginSmsCodeCommand's sibling ConfirmTwoFactorLoginTotpSetupCommand).</summary>
+public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginChallengeResult>
 {
     public static readonly TimeSpan RefreshTokenValidity = TimeSpan.FromDays(30);
 
     private readonly IIdentityService _identity;
+    private readonly ITwoFactorCredentialRepository _twoFactorCredentials;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
-    private readonly IRefreshTokenRepository _refreshTokens;
-    private readonly IClock _clock;
 
     public LoginCommandHandler(
         IIdentityService identity,
-        IJwtTokenGenerator jwtTokenGenerator,
-        IRefreshTokenRepository refreshTokens,
-        IClock clock)
+        ITwoFactorCredentialRepository twoFactorCredentials,
+        IJwtTokenGenerator jwtTokenGenerator)
     {
         _identity = identity;
+        _twoFactorCredentials = twoFactorCredentials;
         _jwtTokenGenerator = jwtTokenGenerator;
-        _refreshTokens = refreshTokens;
-        _clock = clock;
     }
 
-    public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
+    public async Task<LoginChallengeResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var validation = await _identity.ValidateCredentialsAsync(request.Email, request.Password, cancellationToken);
 
@@ -52,14 +49,21 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
         if (profile.RegistrationStatus == RegistrationStatus.Rejected)
             throw new AccountRegistrationRejectedException();
 
-        var accessToken = _jwtTokenGenerator.GenerateAccessToken(userId, profile.Email, profile.Roles);
+        var totpCredential = await _twoFactorCredentials.GetByUserIdAsync(userId, cancellationToken);
+        var phoneStatus = await _identity.GetTwoFactorPhoneStatusAsync(userId, cancellationToken);
 
-        var now = _clock.UtcNow;
-        var rawRefreshToken = RefreshTokenGenerator.GenerateRawToken();
-        var refreshToken = new RefreshToken(
-            RefreshTokenId.New(), userId, RefreshTokenGenerator.Hash(rawRefreshToken), Guid.NewGuid(), now, RefreshTokenValidity);
-        _refreshTokens.Add(refreshToken);
+        var enrolledMethods = new List<string>();
+        if (totpCredential is { IsEnabled: true })
+            enrolledMethods.Add(TwoFactorMethods.Totp);
+        if (phoneStatus.IsVerified)
+            enrolledMethods.Add(TwoFactorMethods.Sms);
 
-        return new LoginResult(accessToken.Value, accessToken.ExpiresAt, rawRefreshToken, refreshToken.ExpiresAt);
+        var requiresSetup = enrolledMethods.Count == 0;
+        var availableMethods = requiresSetup ? TwoFactorMethods.All : enrolledMethods;
+
+        var challengeToken = _jwtTokenGenerator.GenerateTwoFactorChallengeToken(userId);
+
+        return new LoginChallengeResult(
+            challengeToken.Value, challengeToken.ExpiresAt, requiresSetup, availableMethods, phoneStatus.MaskedPhoneNumber);
     }
 }

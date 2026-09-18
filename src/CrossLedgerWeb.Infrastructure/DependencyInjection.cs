@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IStepUpTokenValidator, StepUpTokenValidator>();
+        services.AddScoped<ITwoFactorChallengeTokenValidator, TwoFactorChallengeTokenValidator>();
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -80,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<ITwoFactorCredentialRepository, TwoFactorCredentialRepository>();
         services.AddScoped<IRecoveryCodeRepository, RecoveryCodeRepository>();
         services.AddScoped<IUsedTotpCodeRepository, UsedTotpCodeRepository>();
+        services.AddScoped<ISmsSender, DevLogSmsSender>();
     }
 
     private static void AddExchangeRateProviders(IServiceCollection services, IConfiguration configuration)
