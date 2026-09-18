@@ -14,4 +14,14 @@ public interface IUserAdminService
     /// <summary>Replaces the user's role set with exactly the roles given. Returns false
     /// if no user with this id exists.</summary>
     Task<bool> SetRolesAsync(UserId userId, IReadOnlyList<string> roles, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PendingRegistration>> ListPendingRegistrationsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Returns false if no user with this id exists.</summary>
+    Task<bool> ApproveRegistrationAsync(UserId userId, CancellationToken cancellationToken);
+
+    /// <summary>Returns false if no user with this id exists.</summary>
+    Task<bool> RejectRegistrationAsync(UserId userId, CancellationToken cancellationToken);
+
+    Task<KycDocument?> GetKycDocumentAsync(UserId userId, CancellationToken cancellationToken);
 }

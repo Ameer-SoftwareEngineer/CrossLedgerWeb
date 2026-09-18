@@ -32,7 +32,7 @@ public class LoginCommandHandlerTests
         _identity.Setup(x => x.ValidateCredentialsAsync("user@example.com", "correct-password", It.IsAny<CancellationToken>()))
             .ReturnsAsync(CredentialValidationOutcome.Success(userId));
         _identity.Setup(x => x.GetProfileAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserProfile(userId, "user@example.com", ["Customer"]));
+            .ReturnsAsync(new UserProfile(userId, "user@example.com", ["Customer"], RegistrationStatus.Approved));
         _jwt.Setup(x => x.GenerateAccessToken(userId, "user@example.com", It.Is<IReadOnlyList<string>>(r => r.Contains("Customer"))))
             .Returns(new AccessToken("jwt-value", Now.AddMinutes(15)));
         var handler = CreateHandler();
@@ -68,5 +68,35 @@ public class LoginCommandHandlerTests
         var act = () => handler.Handle(new LoginCommand("user@example.com", "password"), CancellationToken.None);
 
         await act.Should().ThrowAsync<AccountLockedException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_account_pending_approval_when_registration_is_not_yet_reviewed()
+    {
+        var userId = UserId.New();
+        _identity.Setup(x => x.ValidateCredentialsAsync("user@example.com", "correct-password", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CredentialValidationOutcome.Success(userId));
+        _identity.Setup(x => x.GetProfileAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProfile(userId, "user@example.com", ["Customer"], RegistrationStatus.Pending));
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(new LoginCommand("user@example.com", "correct-password"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<AccountPendingApprovalException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_account_registration_rejected_when_an_admin_rejected_the_kyc_review()
+    {
+        var userId = UserId.New();
+        _identity.Setup(x => x.ValidateCredentialsAsync("user@example.com", "correct-password", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CredentialValidationOutcome.Success(userId));
+        _identity.Setup(x => x.GetProfileAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProfile(userId, "user@example.com", ["Customer"], RegistrationStatus.Rejected));
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(new LoginCommand("user@example.com", "correct-password"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<AccountRegistrationRejectedException>();
     }
 }

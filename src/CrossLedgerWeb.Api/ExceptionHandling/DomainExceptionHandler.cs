@@ -44,6 +44,8 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             RegistrationFailedException => (StatusCodes.Status400BadRequest, "Registration failed", "REGISTRATION_FAILED"),
             InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials", "INVALID_CREDENTIALS"),
             AccountLockedException => (StatusCodes.Status423Locked, "Account locked", "ACCOUNT_LOCKED"),
+            AccountPendingApprovalException => (StatusCodes.Status403Forbidden, "Account pending approval", "ACCOUNT_PENDING_APPROVAL"),
+            AccountRegistrationRejectedException => (StatusCodes.Status403Forbidden, "Registration rejected", "ACCOUNT_REGISTRATION_REJECTED"),
             InvalidRefreshTokenException => (StatusCodes.Status401Unauthorized, "Invalid refresh token", "INVALID_REFRESH_TOKEN"),
             RefreshTokenReuseDetectedException => (StatusCodes.Status401Unauthorized, "Refresh token reuse detected", "REFRESH_TOKEN_REUSE_DETECTED"),
             TwoFactorNotEnabledException => (StatusCodes.Status409Conflict, "Two-factor authentication not enabled", "TWO_FACTOR_NOT_ENABLED"),
