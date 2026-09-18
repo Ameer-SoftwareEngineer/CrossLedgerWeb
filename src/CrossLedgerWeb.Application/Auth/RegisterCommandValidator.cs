@@ -16,7 +16,9 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         // it reaches that layer at all.
         RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
 
-        RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.MiddleName).MaximumLength(100);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.PhoneNumber).NotEmpty().MaximumLength(30);
         RuleFor(x => x.Address).NotEmpty().MaximumLength(300);
         RuleFor(x => x.PermanentAddress).NotEmpty().MaximumLength(300);

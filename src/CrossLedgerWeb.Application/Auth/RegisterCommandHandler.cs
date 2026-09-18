@@ -18,7 +18,9 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         var details = new RegistrationDetails(
             request.Email,
             request.Password,
-            request.FullName,
+            request.FirstName,
+            request.MiddleName,
+            request.LastName,
             request.PhoneNumber,
             request.DateOfBirth,
             request.Address,

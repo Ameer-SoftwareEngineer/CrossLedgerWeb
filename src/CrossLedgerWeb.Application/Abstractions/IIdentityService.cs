@@ -16,6 +16,19 @@ public interface IIdentityService
 
     Task<UserProfile?> GetProfileAsync(UserId userId, CancellationToken cancellationToken);
 
+    /// <summary>The KYC profile a user can view about themselves (the Profile page) -
+    /// unlike GetProfileAsync, which is the auth pipeline's own minimal Email+Roles
+    /// shape.</summary>
+    Task<MyProfile?> GetMyProfileAsync(UserId userId, CancellationToken cancellationToken);
+
+    /// <summary>Silently no-ops if the email doesn't match an account - the caller
+    /// always reports success either way, so a wrong email can never be distinguished
+    /// from a right one (no account-enumeration oracle).</summary>
+    Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>False if the email doesn't match an account or the token is invalid/expired.</summary>
+    Task<bool> ResetPasswordAsync(string email, string token, string newPassword, CancellationToken cancellationToken);
+
     /// <summary>Whether the user's phone number has completed SMS two-factor
     /// verification at least once (specification 9's login 2FA) - backed by Identity's
     /// own PhoneNumberConfirmed, so no separate "SMS credential" table is needed.</summary>

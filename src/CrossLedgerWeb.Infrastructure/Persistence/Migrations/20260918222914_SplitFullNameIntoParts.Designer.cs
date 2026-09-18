@@ -5,6 +5,7 @@ using CrossLedgerWeb.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -12,9 +13,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CrossLedgerWebDbContext))]
-    partial class CrossLedgerWebDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918222914_SplitFullNameIntoParts")]
+    partial class SplitFullNameIntoParts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

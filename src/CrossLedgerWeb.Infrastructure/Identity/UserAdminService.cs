@@ -61,7 +61,9 @@ public sealed class UserAdminService : IUserAdminService
             .Select(u => new PendingRegistration(
                 new UserId(u.Id),
                 u.Email!,
-                u.FullName,
+                u.FirstName,
+                u.MiddleName,
+                u.LastName,
                 u.PhoneNumber ?? string.Empty,
                 u.DateOfBirth,
                 u.Address,

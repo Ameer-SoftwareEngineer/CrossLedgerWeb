@@ -1,7 +1,10 @@
-namespace CrossLedgerWeb.Shared.Admin;
+using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.ValueObjects;
 
-public sealed record PendingRegistrationResponse(
-    Guid Id,
+namespace CrossLedgerWeb.Application.Auth;
+
+public sealed record MyProfile(
+    UserId UserId,
     string Email,
     string FirstName,
     string? MiddleName,
@@ -13,6 +16,4 @@ public sealed record PendingRegistrationResponse(
     string City,
     string StateProvince,
     string Country,
-    string ProofOfAddressDocumentType,
-    string ProofOfAddressFileName,
-    DateTimeOffset SubmittedAt);
+    RegistrationStatus RegistrationStatus);

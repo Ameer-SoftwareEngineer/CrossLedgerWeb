@@ -40,7 +40,8 @@ public static class DevelopmentAdminSeeder
                 EmailConfirmed = true,
                 PhoneNumber = "+10000000000",
                 PhoneNumberConfirmed = true,
-                FullName = "Dev Admin",
+                FirstName = "Dev",
+                LastName = "Admin",
                 DateOfBirth = new DateOnly(1990, 1, 1),
                 Address = "N/A",
                 PermanentAddress = "N/A",
@@ -74,6 +75,14 @@ public static class DevelopmentAdminSeeder
             if (string.IsNullOrEmpty(user.PhoneNumber))
             {
                 user.PhoneNumber = "+10000000000";
+                changed = true;
+            }
+
+            // Backfills a row seeded before FullName was split into parts.
+            if (string.IsNullOrEmpty(user.FirstName) && string.IsNullOrEmpty(user.LastName))
+            {
+                user.FirstName = "Dev";
+                user.LastName = "Admin";
                 changed = true;
             }
 

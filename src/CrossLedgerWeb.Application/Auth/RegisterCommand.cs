@@ -6,7 +6,9 @@ namespace CrossLedgerWeb.Application.Auth;
 public sealed record RegisterCommand(
     string Email,
     string Password,
-    string FullName,
+    string FirstName,
+    string? MiddleName,
+    string LastName,
     string PhoneNumber,
     DateOnly DateOfBirth,
     string Address,
