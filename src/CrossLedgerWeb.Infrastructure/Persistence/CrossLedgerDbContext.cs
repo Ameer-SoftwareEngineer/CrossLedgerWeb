@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Domain.Auth;
 using CrossLedgerWeb.Domain.Fx;
+using CrossLedgerWeb.Domain.Otc;
 using CrossLedgerWeb.Domain.Payments;
 using CrossLedgerWeb.Domain.Wallets;
 using CrossLedgerWeb.Infrastructure.Identity;
@@ -28,6 +29,7 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     // Wallet.Entries, matching the repository pattern's aggregate boundary.
     public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<OtcRequest> OtcRequests => Set<OtcRequest>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<RoutingDecisionRecord> RoutingDecisions => Set<RoutingDecisionRecord>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

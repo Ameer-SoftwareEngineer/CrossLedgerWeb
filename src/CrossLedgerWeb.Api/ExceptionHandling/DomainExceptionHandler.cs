@@ -37,6 +37,8 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             UserNotFoundException => (StatusCodes.Status404NotFound, "User not found", "USER_NOT_FOUND"),
             QuoteNotFoundException => (StatusCodes.Status404NotFound, "Quote not found", "QUOTE_NOT_FOUND"),
             QuoteExpiredException => (StatusCodes.Status409Conflict, "Quote expired", "QUOTE_EXPIRED"),
+            OtcRequestNotFoundException => (StatusCodes.Status404NotFound, "OTC request not found", "OTC_REQUEST_NOT_FOUND"),
+            InvalidOtcRequestStateException => (StatusCodes.Status409Conflict, "OTC request already resolved", "OTC_REQUEST_ALREADY_RESOLVED"),
             InsufficientFundsException => (StatusCodes.Status409Conflict, "Insufficient funds", "INSUFFICIENT_FUNDS"),
             CurrencyMismatchException => (StatusCodes.Status400BadRequest, "Currency mismatch", "CURRENCY_MISMATCH"),
             ExchangeRateUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Exchange rate unavailable", "RATE_UNAVAILABLE"),

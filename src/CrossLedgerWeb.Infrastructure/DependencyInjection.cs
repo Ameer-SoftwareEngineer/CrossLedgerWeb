@@ -22,6 +22,7 @@ public static class DependencyInjection
 
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IQuoteRepository, QuoteRepository>();
+        services.AddScoped<IOtcRequestRepository, OtcRequestRepository>();
         services.AddScoped<IFxSettlementWalletResolver, FxSettlementWalletResolver>();
         services.AddScoped<IPayoutReserveWalletResolver, PayoutReserveWalletResolver>();
         services.AddScoped<IPayoutRepository, PayoutRepository>();

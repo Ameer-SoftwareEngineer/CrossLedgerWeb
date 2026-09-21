@@ -222,6 +222,61 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.ToTable("LedgerEntries", (string)null);
                 });
 
+            modelBuilder.Entity("CrossLedgerWeb.Domain.Otc.OtcRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("DeskRate")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<string>("FromCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasColumnName("FromCurrencyCode");
+
+                    b.Property<DateTimeOffset>("OfferExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SourceWalletId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ToCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasColumnName("ToCurrencyCode");
+
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfferExpiresAt");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.ToTable("OtcRequests", (string)null);
+                });
+
             modelBuilder.Entity("CrossLedgerWeb.Domain.Payments.Payout", b =>
                 {
                     b.Property<Guid>("Id")
