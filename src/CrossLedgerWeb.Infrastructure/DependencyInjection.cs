@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Payments;
+using CrossLedgerWeb.Infrastructure.Cards;
 using CrossLedgerWeb.Infrastructure.Fx;
 using CrossLedgerWeb.Infrastructure.Identity;
 using CrossLedgerWeb.Infrastructure.Persistence;
@@ -23,6 +24,10 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IQuoteRepository, QuoteRepository>();
         services.AddScoped<IOtcRequestRepository, OtcRequestRepository>();
+        services.AddScoped<ICardRepository, CardRepository>();
+        services.AddScoped<ICardPurchaseRepository, CardPurchaseRepository>();
+        services.AddScoped<IMerchantSettlementWalletResolver, MerchantSettlementWalletResolver>();
+        services.AddScoped<ICardNumberGenerator, CardNumberGenerator>();
         services.AddScoped<IFxSettlementWalletResolver, FxSettlementWalletResolver>();
         services.AddScoped<IPayoutReserveWalletResolver, PayoutReserveWalletResolver>();
         services.AddScoped<IPayoutRepository, PayoutRepository>();

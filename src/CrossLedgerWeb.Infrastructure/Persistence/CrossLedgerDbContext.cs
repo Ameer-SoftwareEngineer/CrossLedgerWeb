@@ -1,4 +1,5 @@
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Fx;
 using CrossLedgerWeb.Domain.Otc;
 using CrossLedgerWeb.Domain.Payments;
@@ -18,11 +19,13 @@ namespace CrossLedgerWeb.Infrastructure.Persistence;
 public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
 {
     private readonly IDataProtector _totpSecretProtector;
+    private readonly IDataProtector _cardDataProtector;
 
     public CrossLedgerWebDbContext(DbContextOptions<CrossLedgerWebDbContext> options, IDataProtectionProvider dataProtectionProvider)
         : base(options)
     {
         _totpSecretProtector = dataProtectionProvider.CreateProtector("CrossLedgerWeb.TwoFactorCredential.Secret");
+        _cardDataProtector = dataProtectionProvider.CreateProtector("CrossLedgerWeb.Card.PanAndCvv");
     }
 
     // Only aggregate roots get a DbSet - LedgerEntry is reached exclusively through
@@ -38,6 +41,8 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     public DbSet<UsedTotpCode> UsedTotpCodes => Set<UsedTotpCode>();
     public DbSet<Payout> Payouts => Set<Payout>();
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+    public DbSet<Card> Cards => Set<Card>();
+    public DbSet<CardPurchase> CardPurchases => Set<CardPurchase>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,7 +53,8 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
         // scan and applied here instead.
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(CrossLedgerWebDbContext).Assembly,
-            type => type != typeof(TwoFactorCredentialConfiguration));
+            type => type != typeof(TwoFactorCredentialConfiguration) && type != typeof(CardConfiguration));
         modelBuilder.ApplyConfiguration(new TwoFactorCredentialConfiguration(_totpSecretProtector));
+        modelBuilder.ApplyConfiguration(new CardConfiguration(_cardDataProtector));
     }
 }

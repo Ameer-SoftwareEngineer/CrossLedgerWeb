@@ -17,4 +17,12 @@ public enum WalletKind
     /// money that is actually leaving the platform. Exempt from the non-negative check for
     /// the same reason SystemClearing is.</summary>
     PayoutReserve,
+
+    /// <summary>Holds funds debited from a customer wallet for a simulated card
+    /// purchase. Same reasoning as <see cref="PayoutReserve"/> - the money is leaving the
+    /// platform to a merchant, not moving between two of the platform's own wallets - kept
+    /// as its own kind rather than reusing PayoutReserve so the two settlement purposes
+    /// stay distinguishable in the ledger. Exempt from the non-negative check for the same
+    /// reason the other two are.</summary>
+    MerchantSettlement,
 }
