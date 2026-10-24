@@ -51,7 +51,10 @@ public sealed class Wallet
         if (amount.Currency != Currency)
             throw new CurrencyMismatchException(Currency, amount.Currency);
 
-        if (direction == LedgerDirection.Debit && Kind == WalletKind.Customer && Balance < amount)
+        // Customer and Card wallets must never overdraw; SystemClearing, PayoutReserve
+        // and MerchantSettlement are internal settlement accounts that legitimately run
+        // negative between the two legs of whatever they're clearing.
+        if (direction == LedgerDirection.Debit && Kind is WalletKind.Customer or WalletKind.Card && Balance < amount)
             throw new InsufficientFundsException(Id, Balance, amount);
 
         var entry = new LedgerEntry(LedgerEntryId.New(), transferId, Id, direction, amount, postedAt);

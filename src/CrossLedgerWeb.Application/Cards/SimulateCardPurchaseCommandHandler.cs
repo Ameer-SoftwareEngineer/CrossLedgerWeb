@@ -44,8 +44,8 @@ public sealed class SimulateCardPurchaseCommandHandler : IRequestHandler<Simulat
         var amount = new Money(request.Amount, card.Currency);
         card.EnsureCanSpend(amount);
 
-        var wallet = await _wallets.GetByIdAsync(card.LinkedWalletId, cancellationToken)
-            ?? throw new WalletNotFoundException(card.LinkedWalletId);
+        var wallet = await _wallets.GetByIdAsync(card.CardWalletId, cancellationToken)
+            ?? throw new WalletNotFoundException(card.CardWalletId);
 
         var merchantSettlementWallet = await _merchantSettlementWallets.GetMerchantSettlementWalletAsync(card.Currency, cancellationToken);
 

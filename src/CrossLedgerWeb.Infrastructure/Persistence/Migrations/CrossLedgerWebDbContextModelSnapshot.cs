@@ -147,6 +147,14 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("CardType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("CardWalletId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("CardholderName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -167,17 +175,31 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(512)")
                         .HasColumnName("EncryptedCvv");
 
+                    b.Property<string>("EmployerCompanyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("EstimatedGrossAnnualIncome")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("EstimatedNetWorth")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("ExpiryMonth")
                         .HasColumnType("int");
 
                     b.Property<int>("ExpiryYear")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsActivelyEmployed")
+                        .HasColumnType("bit");
+
                     b.Property<DateTimeOffset>("IssuedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid>("LinkedWalletId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uniqueidentifier");
@@ -188,6 +210,11 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(512)")
                         .HasColumnName("EncryptedPan");
 
+                    b.Property<string>("SourceOfFunds")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<decimal?>("SpendingLimit")
                         .HasColumnType("decimal(18,2)");
 
@@ -195,6 +222,88 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.ComplexProperty<Dictionary<string, object>>("RegisteredAddress", "CrossLedgerWeb.Domain.Cards.Card.RegisteredAddress#CardAddress", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("City")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("RegisteredCity");
+
+                            b1.Property<string>("Country")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("RegisteredCountry");
+
+                            b1.Property<string>("Number")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("RegisteredNumber");
+
+                            b1.Property<string>("Postcode")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("RegisteredPostcode");
+
+                            b1.Property<string>("State")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("RegisteredState");
+
+                            b1.Property<string>("Street")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)")
+                                .HasColumnName("RegisteredStreet");
+                        });
+
+                    b.ComplexProperty<Dictionary<string, object>>("ShippingAddress", "CrossLedgerWeb.Domain.Cards.Card.ShippingAddress#CardAddress", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("City")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("ShippingCity");
+
+                            b1.Property<string>("Country")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("ShippingCountry");
+
+                            b1.Property<string>("Number")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("ShippingNumber");
+
+                            b1.Property<string>("Postcode")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("ShippingPostcode");
+
+                            b1.Property<string>("State")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("ShippingState");
+
+                            b1.Property<string>("Street")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)")
+                                .HasColumnName("ShippingStreet");
+                        });
 
                     b.HasKey("Id");
 

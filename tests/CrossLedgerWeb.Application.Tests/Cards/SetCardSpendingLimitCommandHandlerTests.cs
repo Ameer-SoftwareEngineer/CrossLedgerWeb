@@ -14,13 +14,16 @@ public class SetCardSpendingLimitCommandHandlerTests
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly UserId Owner = UserId.New();
+    private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
 
     private readonly Mock<ICardRepository> _cards = new();
     private readonly Card _card;
 
     public SetCardSpendingLimitCommandHandlerTests()
     {
-        _card = new Card(CardId.New(), Owner, WalletId.New(), Usd, "Test Customer", "4532750123456784", "123", 1, 2029, Now);
+        _card = new Card(
+            CardId.New(), Owner, WalletId.New(), Usd, CardType.Virtual, "Test Customer", "4532750123456784", "123", 1, 2029, Now,
+            SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", TestAddress, TestAddress);
         _cards.Setup(x => x.GetByIdAsync(_card.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_card);
     }
 

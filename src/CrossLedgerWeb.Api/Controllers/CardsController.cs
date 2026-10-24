@@ -35,11 +35,25 @@ public sealed class CardsController : ControllerBase
         if (!User.TryGetUserId(out var userId))
             return Unauthorized();
 
-        var result = await _mediator.Send(new IssueCardCommand(userId, new WalletId(request.LinkedWalletId), request.CardholderName), cancellationToken);
+        var command = new IssueCardCommand(
+            userId,
+            request.Currency,
+            Enum.Parse<CardType>(request.CardType, ignoreCase: true),
+            request.CardholderName,
+            Enum.Parse<SourceOfFunds>(request.SourceOfFunds, ignoreCase: true),
+            request.EstimatedGrossAnnualIncome,
+            request.EstimatedNetWorth,
+            request.IsActivelyEmployed,
+            request.EmployerCompanyName,
+            request.JobTitle,
+            ToDomainAddress(request.RegisteredAddress),
+            request.ShippingAddress is null ? null : ToDomainAddress(request.ShippingAddress));
+
+        var result = await _mediator.Send(command, cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, ToResponse(
-            result.CardId, result.LinkedWalletId, result.Currency, result.CardholderName,
-            result.Last4, result.ExpiryMonth, result.ExpiryYear, result.Status, null, result.IssuedAt));
+            result.CardId, result.CardWalletId, result.Currency, result.CardType, result.CardholderName,
+            result.Last4, result.ExpiryMonth, result.ExpiryYear, result.Status, null, result.Balance, result.IssuedAt));
     }
 
     [HttpGet]
@@ -52,8 +66,33 @@ public sealed class CardsController : ControllerBase
         var cards = await _mediator.Send(new ListMyCardsQuery(userId), cancellationToken);
 
         var response = cards.Select(c => ToResponse(
-            c.CardId, c.LinkedWalletId, c.Currency, c.CardholderName, c.Last4,
-            c.ExpiryMonth, c.ExpiryYear, c.Status, c.SpendingLimit, c.IssuedAt)).ToList();
+            c.CardId, c.CardWalletId, c.Currency, c.CardType, c.CardholderName, c.Last4,
+            c.ExpiryMonth, c.ExpiryYear, c.Status, c.SpendingLimit, c.Balance, c.IssuedAt)).ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>Moves money from one of the caller's own wallets into their card's
+    /// dedicated balance - gated the same way a regular transfer is (step-up above
+    /// Limits:StepUpAbove), since it's still money leaving a wallet.</summary>
+    [HttpPost("{cardId:guid}/top-up")]
+    [RequireStepUp(Operation = StepUpOperation.HighValueTransfer, ThresholdSetting = "Limits:StepUpAbove")]
+    [ProducesResponseType<TopUpCardResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TopUpCardResponse>> TopUp(
+        Guid cardId,
+        TopUpCardRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var result = await _mediator.Send(
+            new TopUpCardCommand(new CardId(cardId), userId, new WalletId(request.SourceWalletId), request.Amount, idempotencyKey),
+            cancellationToken);
+
+        var response = new TopUpCardResponse(
+            result.TransferId.Value, result.Amount.Amount, result.Amount.Currency.Code, result.NewCardBalance, result.PostedAt);
 
         return Ok(response);
     }
@@ -158,7 +197,10 @@ public sealed class CardsController : ControllerBase
     }
 
     private static CardResponse ToResponse(
-        CardId cardId, WalletId linkedWalletId, Currency currency, string cardholderName,
-        string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, DateTimeOffset issuedAt) =>
-        new(cardId.Value, linkedWalletId.Value, currency.Code, cardholderName, last4, expiryMonth, expiryYear, status.ToString(), spendingLimit, issuedAt);
+        CardId cardId, WalletId cardWalletId, Currency currency, CardType cardType, string cardholderName,
+        string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, decimal balance, DateTimeOffset issuedAt) =>
+        new(cardId.Value, cardWalletId.Value, currency.Code, cardType.ToString(), cardholderName, last4, expiryMonth, expiryYear, status.ToString(), spendingLimit, balance, issuedAt);
+
+    private static Domain.Cards.CardAddress ToDomainAddress(CardAddressDto dto) =>
+        new(dto.Street, dto.Number, dto.State, dto.Postcode, dto.City, dto.Country);
 }

@@ -16,6 +16,7 @@ public class SimulateCardPurchaseCommandHandlerTests
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly UserId Owner = UserId.New();
+    private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
 
     private readonly Mock<ICardRepository> _cards = new();
     private readonly Mock<ICardPurchaseRepository> _purchases = new();
@@ -24,19 +25,21 @@ public class SimulateCardPurchaseCommandHandlerTests
     private readonly Mock<IClock> _clock = new();
 
     private readonly Card _card;
-    private readonly Wallet _linkedWallet;
+    private readonly Wallet _cardWallet;
     private readonly Wallet _merchantWallet;
 
     public SimulateCardPurchaseCommandHandlerTests()
     {
-        _linkedWallet = new Wallet(WalletId.New(), Owner, Usd);
-        _linkedWallet.Credit(new Money(500m, Usd), TransferId.New(), Now);
+        _cardWallet = new Wallet(WalletId.New(), Owner, Usd, WalletKind.Card);
+        _cardWallet.Credit(new Money(500m, Usd), TransferId.New(), Now);
         _merchantWallet = new Wallet(WalletId.New(), UserId.New(), Usd, WalletKind.MerchantSettlement);
 
-        _card = new Card(CardId.New(), Owner, _linkedWallet.Id, Usd, "Test Customer", "4532750123456784", "123", 1, 2029, Now);
+        _card = new Card(
+            CardId.New(), Owner, _cardWallet.Id, Usd, CardType.Virtual, "Test Customer", "4532750123456784", "123", 1, 2029, Now,
+            SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", TestAddress, TestAddress);
 
         _cards.Setup(x => x.GetByIdAsync(_card.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_card);
-        _wallets.Setup(x => x.GetByIdAsync(_linkedWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_linkedWallet);
+        _wallets.Setup(x => x.GetByIdAsync(_cardWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_cardWallet);
         _merchantSettlementWallets.Setup(x => x.GetMerchantSettlementWalletAsync(Usd, It.IsAny<CancellationToken>())).ReturnsAsync(_merchantWallet);
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
@@ -48,14 +51,14 @@ public class SimulateCardPurchaseCommandHandlerTests
         new(_card.Id, Owner, "Coffee Shop", amount, "idem-key-1");
 
     [Fact]
-    public async Task Handle_debits_the_linked_wallet_and_credits_the_merchant_settlement_wallet()
+    public async Task Handle_debits_the_card_wallet_and_credits_the_merchant_settlement_wallet()
     {
         var handler = CreateHandler();
 
         var result = await handler.Handle(ValidCommand(40m), CancellationToken.None);
 
         result.Amount.Should().Be(new Money(40m, Usd));
-        _linkedWallet.Balance.Amount.Should().Be(460m);
+        _cardWallet.Balance.Amount.Should().Be(460m);
         _merchantWallet.Balance.Amount.Should().Be(40m);
     }
 

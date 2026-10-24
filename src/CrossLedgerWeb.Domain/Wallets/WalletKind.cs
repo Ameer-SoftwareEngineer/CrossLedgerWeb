@@ -25,4 +25,12 @@ public enum WalletKind
     /// stay distinguishable in the ledger. Exempt from the non-negative check for the same
     /// reason the other two are.</summary>
     MerchantSettlement,
+
+    /// <summary>The dedicated wallet backing one Card (prepaid model) - starts at zero,
+    /// only ever credited by a TopUp and debited by a simulated purchase. Unlike the
+    /// other non-Customer kinds, this one IS subject to the non-negative balance check
+    /// (a prepaid card cannot overdraw) - kept as its own kind rather than reusing
+    /// Customer so it can be filtered out of the regular Wallets list/sidebar, which
+    /// should only ever show wallets the owner manages directly.</summary>
+    Card,
 }

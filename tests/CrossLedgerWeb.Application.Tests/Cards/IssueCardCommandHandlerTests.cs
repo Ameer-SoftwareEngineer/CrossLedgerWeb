@@ -1,6 +1,5 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Cards;
-using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Fx;
 using CrossLedgerWeb.Domain.ValueObjects;
@@ -12,10 +11,9 @@ namespace CrossLedgerWeb.Application.Tests.Cards;
 
 public class IssueCardCommandHandlerTests
 {
-    private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly UserId Owner = UserId.New();
-    private static readonly WalletId LinkedWalletId = WalletId.New();
+    private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
 
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<ICardRepository> _cards = new();
@@ -24,59 +22,52 @@ public class IssueCardCommandHandlerTests
 
     public IssueCardCommandHandlerTests()
     {
-        var wallet = new Wallet(LinkedWalletId, Owner, Usd);
-        _wallets.Setup(x => x.GetByIdAsync(LinkedWalletId, It.IsAny<CancellationToken>())).ReturnsAsync(wallet);
         _numberGenerator.Setup(x => x.Generate()).Returns(("4532750123456784", "123"));
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
 
     private IssueCardCommandHandler CreateHandler() => new(_wallets.Object, _cards.Object, _numberGenerator.Object, _clock.Object);
 
-    private static IssueCardCommand ValidCommand() => new(Owner, LinkedWalletId, "Test Customer");
+    private static IssueCardCommand ValidCommand(CardAddress? shippingAddress = null) => new(
+        Owner, "USD", CardType.Virtual, "Test Customer", SourceOfFunds.Salary, 5000m, 100000m, true,
+        "Acme Inc", "Developer", TestAddress, shippingAddress);
 
     [Fact]
-    public async Task Handle_issues_a_card_linked_to_the_wallets_currency()
+    public async Task Handle_issues_a_card_with_a_fresh_zero_balance_card_wallet()
     {
         var handler = CreateHandler();
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
-        result.Currency.Should().Be(Usd);
+        result.Currency.Should().Be(Currency.From("USD"));
+        result.CardType.Should().Be(CardType.Virtual);
         result.Last4.Should().Be("6784");
         result.Status.Should().Be(CardStatus.Active);
+        result.Balance.Should().Be(0m);
         result.ExpiryYear.Should().Be(Now.Year + 3);
     }
 
     [Fact]
-    public async Task Handle_stages_the_card_for_insertion()
+    public async Task Handle_stages_both_the_card_wallet_and_the_card_for_insertion()
     {
         var handler = CreateHandler();
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
-        _cards.Verify(x => x.Add(It.Is<Card>(c => c.Id == result.CardId)), Times.Once);
+        _wallets.Verify(x => x.Add(It.Is<Wallet>(w => w.Id == result.CardWalletId && w.Kind == WalletKind.Card)), Times.Once);
+        _cards.Verify(x => x.Add(It.Is<Card>(c => c.Id == result.CardId && c.CardWalletId == result.CardWalletId)), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_throws_when_the_wallet_does_not_exist()
+    public async Task Handle_defaults_the_shipping_address_to_the_registered_address_when_not_given()
     {
-        _wallets.Setup(x => x.GetByIdAsync(LinkedWalletId, It.IsAny<CancellationToken>())).ReturnsAsync((Wallet?)null);
         var handler = CreateHandler();
+        Card? staged = null;
+        _cards.Setup(x => x.Add(It.IsAny<Card>())).Callback<Card>(c => staged = c);
 
-        var act = () => handler.Handle(ValidCommand(), CancellationToken.None);
+        await handler.Handle(ValidCommand(shippingAddress: null), CancellationToken.None);
 
-        await act.Should().ThrowAsync<WalletNotFoundException>();
-    }
-
-    [Fact]
-    public async Task Handle_throws_the_same_not_found_error_when_the_wallet_belongs_to_someone_else()
-    {
-        var othersWallet = new Wallet(LinkedWalletId, UserId.New(), Usd);
-        _wallets.Setup(x => x.GetByIdAsync(LinkedWalletId, It.IsAny<CancellationToken>())).ReturnsAsync(othersWallet);
-        var handler = CreateHandler();
-
-        var act = () => handler.Handle(ValidCommand(), CancellationToken.None);
-
-        await act.Should().ThrowAsync<WalletNotFoundException>();
+        staged.Should().NotBeNull();
+        staged!.ShippingAddress.Should().Be(TestAddress);
     }
 }

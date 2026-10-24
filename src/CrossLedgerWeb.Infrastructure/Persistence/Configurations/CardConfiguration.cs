@@ -31,8 +31,9 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).HasConversion(new CardIdConverter()).ValueGeneratedNever();
         builder.Property(c => c.OwnerId).HasConversion(new UserIdConverter());
-        builder.Property(c => c.LinkedWalletId).HasConversion(new WalletIdConverter());
+        builder.Property(c => c.CardWalletId).HasConversion(new WalletIdConverter());
         builder.Property(c => c.Currency).HasConversion(new CurrencyConverter()).HasColumnName("CurrencyCode").HasMaxLength(3);
+        builder.Property(c => c.CardType).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.CardholderName).HasMaxLength(100);
 
         builder.Property(c => c.Pan)
@@ -51,6 +52,34 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.SpendingLimit).HasColumnType("decimal(18,2)");
         builder.Property(c => c.ClosedAt);
+
+        // Issuance-intake fields (display/record-keeping only - see Card's own docs).
+        builder.Property(c => c.SourceOfFunds).HasConversion<string>().HasMaxLength(30);
+        builder.Property(c => c.EstimatedGrossAnnualIncome).HasColumnType("decimal(18,2)");
+        builder.Property(c => c.EstimatedNetWorth).HasColumnType("decimal(18,2)");
+        builder.Property(c => c.IsActivelyEmployed);
+        builder.Property(c => c.EmployerCompanyName).HasMaxLength(200);
+        builder.Property(c => c.JobTitle).HasMaxLength(200);
+
+        builder.ComplexProperty(c => c.RegisteredAddress, address =>
+        {
+            address.Property(a => a.Street).HasColumnName("RegisteredStreet").HasMaxLength(200);
+            address.Property(a => a.Number).HasColumnName("RegisteredNumber").HasMaxLength(50);
+            address.Property(a => a.State).HasColumnName("RegisteredState").HasMaxLength(100);
+            address.Property(a => a.Postcode).HasColumnName("RegisteredPostcode").HasMaxLength(20);
+            address.Property(a => a.City).HasColumnName("RegisteredCity").HasMaxLength(100);
+            address.Property(a => a.Country).HasColumnName("RegisteredCountry").HasMaxLength(100);
+        });
+
+        builder.ComplexProperty(c => c.ShippingAddress, address =>
+        {
+            address.Property(a => a.Street).HasColumnName("ShippingStreet").HasMaxLength(200);
+            address.Property(a => a.Number).HasColumnName("ShippingNumber").HasMaxLength(50);
+            address.Property(a => a.State).HasColumnName("ShippingState").HasMaxLength(100);
+            address.Property(a => a.Postcode).HasColumnName("ShippingPostcode").HasMaxLength(20);
+            address.Property(a => a.City).HasColumnName("ShippingCity").HasMaxLength(100);
+            address.Property(a => a.Country).HasColumnName("ShippingCountry").HasMaxLength(100);
+        });
 
         // Last4 is derived from Pan, never its own column.
         builder.Ignore(c => c.Last4);

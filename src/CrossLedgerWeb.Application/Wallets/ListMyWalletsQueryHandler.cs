@@ -1,4 +1,5 @@
 using CrossLedgerWeb.Application.Abstractions;
+using CrossLedgerWeb.Domain.Wallets;
 using MediatR;
 
 namespace CrossLedgerWeb.Application.Wallets;
@@ -16,6 +17,12 @@ public sealed class ListMyWalletsQueryHandler : IRequestHandler<ListMyWalletsQue
     {
         var wallets = await _wallets.ListByOwnerAsync(request.OwnerId, cancellationToken);
 
-        return wallets.Select(w => new WalletSummary(w.Id, w.Currency, w.Balance)).ToList();
+        // Card-kind wallets are a card's own dedicated balance, not something the owner
+        // manages directly - they never belong in the Wallets page, the sidebar, or any
+        // "pick a wallet" selector built from this query.
+        return wallets
+            .Where(w => w.Kind == WalletKind.Customer)
+            .Select(w => new WalletSummary(w.Id, w.Currency, w.Balance))
+            .ToList();
     }
 }

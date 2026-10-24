@@ -17,6 +17,8 @@ public sealed class CardPersistenceTests : IDisposable
 {
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset IssuedAt = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly CardAddress RegisteredAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
+    private static readonly CardAddress ShippingAddress = new("456 Other Ave", "7C", "NY", "10001", "New York", "US");
 
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<CrossLedgerWebDbContext> _options;
@@ -37,7 +39,8 @@ public sealed class CardPersistenceTests : IDisposable
     public void Dispose() => _connection.Dispose();
 
     private static Card NewCard() => new(
-        CardId.New(), UserId.New(), WalletId.New(), Usd, "Test Customer", "4532750123456784", "123", 6, 2029, IssuedAt);
+        CardId.New(), UserId.New(), WalletId.New(), Usd, CardType.Virtual, "Test Customer", "4532750123456784", "123", 6, 2029, IssuedAt,
+        SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", RegisteredAddress, ShippingAddress);
 
     [Fact]
     public async Task A_cards_pan_and_cvv_round_trip_decrypted_through_the_same_protector()
@@ -58,6 +61,8 @@ public sealed class CardPersistenceTests : IDisposable
         reloaded.Cvv.Should().Be("123");
         reloaded.Last4.Should().Be("6784");
         reloaded.Status.Should().Be(CardStatus.Active);
+        reloaded.RegisteredAddress.Should().Be(RegisteredAddress);
+        reloaded.ShippingAddress.Should().Be(ShippingAddress);
     }
 
     [Fact]

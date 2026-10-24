@@ -10,9 +10,11 @@ public class CardTests
 {
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset IssuedAt = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
 
-    private static Card NewCard() => new(
-        CardId.New(), UserId.New(), WalletId.New(), Usd, "Test Customer", "4532750123456784", "123", 1, 2029, IssuedAt);
+    private static Card NewCard(string cardholderName = "Test Customer", string pan = "4532750123456784", string cvv = "123") => new(
+        CardId.New(), UserId.New(), WalletId.New(), Usd, CardType.Virtual, cardholderName, pan, cvv, 1, 2029, IssuedAt,
+        SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", TestAddress, TestAddress);
 
     [Fact]
     public void Constructor_starts_the_card_as_Active_with_no_spending_limit()
@@ -35,7 +37,7 @@ public class CardTests
     [Fact]
     public void Constructor_rejects_a_blank_cardholder_name()
     {
-        var act = () => new Card(CardId.New(), UserId.New(), WalletId.New(), Usd, " ", "4532750123456784", "123", 1, 2029, IssuedAt);
+        var act = () => NewCard(cardholderName: " ");
 
         act.Should().Throw<ArgumentException>();
     }
@@ -45,7 +47,7 @@ public class CardTests
     [InlineData("abcd12345678")]
     public void Constructor_rejects_an_invalid_pan(string pan)
     {
-        var act = () => new Card(CardId.New(), UserId.New(), WalletId.New(), Usd, "Test Customer", pan, "123", 1, 2029, IssuedAt);
+        var act = () => NewCard(pan: pan);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -55,7 +57,7 @@ public class CardTests
     [InlineData("abcd")]
     public void Constructor_rejects_an_invalid_cvv(string cvv)
     {
-        var act = () => new Card(CardId.New(), UserId.New(), WalletId.New(), Usd, "Test Customer", "4532750123456784", cvv, 1, 2029, IssuedAt);
+        var act = () => NewCard(cvv: cvv);
 
         act.Should().Throw<ArgumentException>();
     }
