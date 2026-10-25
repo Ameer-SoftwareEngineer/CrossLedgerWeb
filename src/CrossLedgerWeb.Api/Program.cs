@@ -45,6 +45,9 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddPaymentProviders(builder.Configuration);
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRequestContextAccessor, HttpRequestContextAccessor>();
+
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<FxRateBroadcastService>();
 
@@ -137,6 +140,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+
+app.UseSecurityHeaders(app.Environment.IsDevelopment());
 
 app.UseHttpsRedirection();
 

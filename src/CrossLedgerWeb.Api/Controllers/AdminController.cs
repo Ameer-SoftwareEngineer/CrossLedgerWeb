@@ -111,4 +111,23 @@ public sealed class AdminController : ControllerBase
 
         return Ok(response);
     }
+
+    [HttpGet("security-events")]
+    [ProducesResponseType<SecurityAuditEventPageResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<SecurityAuditEventPageResponse>> ListSecurityEvents(
+        [FromQuery] int pageNumber, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var page = await _mediator.Send(new ListSecurityAuditEventsQuery(pageNumber, pageSize), cancellationToken);
+
+        var response = new SecurityAuditEventPageResponse(
+            page.Entries
+                .Select(e => new SecurityAuditEventResponse(
+                    e.UserId, e.Subject, e.EventType, e.Succeeded, e.FailureReason, e.IpAddress, e.UserAgent, e.OccurredAt))
+                .ToList(),
+            page.TotalCount,
+            page.PageNumber,
+            page.PageSize);
+
+        return Ok(response);
+    }
 }

@@ -1,6 +1,8 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Security;
+using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
 
 namespace CrossLedgerWeb.Application.Auth;
@@ -16,15 +18,24 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginCha
     private readonly IIdentityService _identity;
     private readonly ITwoFactorCredentialRepository _twoFactorCredentials;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ISecurityAuditLogRepository _auditLog;
+    private readonly IRequestContextAccessor _requestContext;
+    private readonly IClock _clock;
 
     public LoginCommandHandler(
         IIdentityService identity,
         ITwoFactorCredentialRepository twoFactorCredentials,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator,
+        ISecurityAuditLogRepository auditLog,
+        IRequestContextAccessor requestContext,
+        IClock clock)
     {
         _identity = identity;
         _twoFactorCredentials = twoFactorCredentials;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _auditLog = auditLog;
+        _requestContext = requestContext;
+        _clock = clock;
     }
 
     public async Task<LoginChallengeResult> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -32,12 +43,19 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginCha
         var validation = await _identity.ValidateCredentialsAsync(request.Email, request.Password, cancellationToken);
 
         if (validation.IsLockedOut)
+        {
+            await RecordAsync(validation.UserId, request.Email, succeeded: false, "AccountLocked", cancellationToken);
             throw new AccountLockedException(request.Email);
+        }
 
         if (!validation.Succeeded)
+        {
+            await RecordAsync(validation.UserId, request.Email, succeeded: false, "InvalidCredentials", cancellationToken);
             throw new InvalidCredentialsException();
+        }
 
         var userId = validation.UserId!.Value;
+        await RecordAsync(userId, request.Email, succeeded: true, failureReason: null, cancellationToken);
         var profile = await _identity.GetProfileAsync(userId, cancellationToken)
             ?? throw new InvalidCredentialsException();
 
@@ -66,4 +84,11 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginCha
         return new LoginChallengeResult(
             challengeToken.Value, challengeToken.ExpiresAt, requiresSetup, availableMethods, phoneStatus.MaskedPhoneNumber);
     }
+
+    private Task RecordAsync(UserId? userId, string email, bool succeeded, string? failureReason, CancellationToken cancellationToken) =>
+        _auditLog.RecordAsync(
+            new SecurityAuditEvent(
+                SecurityAuditEventId.New(), userId, email, SecurityEventType.LoginPassword, succeeded, failureReason,
+                _requestContext.IpAddress, _requestContext.UserAgent, _clock.UtcNow),
+            cancellationToken);
 }

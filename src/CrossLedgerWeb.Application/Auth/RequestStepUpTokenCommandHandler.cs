@@ -1,6 +1,7 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
 
@@ -21,6 +22,8 @@ public sealed class RequestStepUpTokenCommandHandler : IRequestHandler<RequestSt
     private readonly IUsedTotpCodeRepository _usedCodes;
     private readonly ITotpProvider _totp;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ISecurityAuditLogRepository _auditLog;
+    private readonly IRequestContextAccessor _requestContext;
     private readonly IClock _clock;
 
     public RequestStepUpTokenCommandHandler(
@@ -28,12 +31,16 @@ public sealed class RequestStepUpTokenCommandHandler : IRequestHandler<RequestSt
         IUsedTotpCodeRepository usedCodes,
         ITotpProvider totp,
         IJwtTokenGenerator jwtTokenGenerator,
+        ISecurityAuditLogRepository auditLog,
+        IRequestContextAccessor requestContext,
         IClock clock)
     {
         _credentials = credentials;
         _usedCodes = usedCodes;
         _totp = totp;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _auditLog = auditLog;
+        _requestContext = requestContext;
         _clock = clock;
     }
 
@@ -46,15 +53,29 @@ public sealed class RequestStepUpTokenCommandHandler : IRequestHandler<RequestSt
         var now = _clock.UtcNow;
 
         if (await _usedCodes.IsActiveAsync(request.UserId, request.Code, now, cancellationToken))
+        {
+            await RecordAsync(request, succeeded: false, "CodeReplayed", cancellationToken);
             throw new TotpCodeReplayedException();
+        }
 
         if (!_totp.VerifyCode(credential.Secret, request.Code))
+        {
+            await RecordAsync(request, succeeded: false, "InvalidCode", cancellationToken);
             throw new InvalidTotpCodeException();
+        }
 
         _usedCodes.Add(new UsedTotpCode(UsedTotpCodeId.New(), request.UserId, request.Code, now, now + UsedCodeRetention));
+        await RecordAsync(request, succeeded: true, failureReason: null, cancellationToken);
 
         var token = _jwtTokenGenerator.GenerateStepUpToken(request.UserId, request.Operation);
 
         return new StepUpTokenResult(token.Value, token.ExpiresAt);
     }
+
+    private Task RecordAsync(RequestStepUpTokenCommand request, bool succeeded, string? failureReason, CancellationToken cancellationToken) =>
+        _auditLog.RecordAsync(
+            new SecurityAuditEvent(
+                SecurityAuditEventId.New(), request.UserId, $"{request.UserId} ({request.Operation})", SecurityEventType.StepUpToken,
+                succeeded, failureReason, _requestContext.IpAddress, _requestContext.UserAgent, _clock.UtcNow),
+            cancellationToken);
 }

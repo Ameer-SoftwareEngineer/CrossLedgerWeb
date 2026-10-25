@@ -2,6 +2,7 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using FluentAssertions;
 using Moq;
@@ -15,9 +16,17 @@ public class LoginCommandHandlerTests
     private readonly Mock<IIdentityService> _identity = new();
     private readonly Mock<ITwoFactorCredentialRepository> _twoFactorCredentials = new();
     private readonly Mock<IJwtTokenGenerator> _jwt = new();
+    private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
+    private readonly Mock<IRequestContextAccessor> _requestContext = new();
+    private readonly Mock<IClock> _clock = new();
+
+    public LoginCommandHandlerTests()
+    {
+        _clock.Setup(x => x.UtcNow).Returns(Now);
+    }
 
     private LoginCommandHandler CreateHandler() =>
-        new(_identity.Object, _twoFactorCredentials.Object, _jwt.Object);
+        new(_identity.Object, _twoFactorCredentials.Object, _jwt.Object, _auditLog.Object, _requestContext.Object, _clock.Object);
 
     private void SetUpValidCredentials(UserId userId, RegistrationStatus status = RegistrationStatus.Approved)
     {
@@ -127,5 +136,38 @@ public class LoginCommandHandlerTests
         var act = () => handler.Handle(new LoginCommand("user@example.com", "correct-password"), CancellationToken.None);
 
         await act.Should().ThrowAsync<AccountRegistrationRejectedException>();
+    }
+
+    [Fact]
+    public async Task Handle_records_a_successful_audit_event_once_credentials_validate()
+    {
+        var userId = UserId.New();
+        SetUpValidCredentials(userId);
+        _twoFactorCredentials.Setup(x => x.GetByUserIdAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync((TwoFactorCredential?)null);
+        _identity.Setup(x => x.GetTwoFactorPhoneStatusAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TwoFactorPhoneStatus(false, null));
+        _jwt.Setup(x => x.GenerateTwoFactorChallengeToken(userId)).Returns(new AccessToken("challenge-value", Now.AddMinutes(10)));
+        var handler = CreateHandler();
+
+        await handler.Handle(new LoginCommand("user@example.com", "correct-password"), CancellationToken.None);
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == userId && e.EventType == SecurityEventType.LoginPassword && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_records_a_failed_audit_event_when_credentials_are_invalid()
+    {
+        _identity.Setup(x => x.ValidateCredentialsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CredentialValidationOutcome.Failed);
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(new LoginCommand("user@example.com", "wrong-password"), CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidCredentialsException>();
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == null && !e.Succeeded && e.EventType == SecurityEventType.LoginPassword),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

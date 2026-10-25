@@ -2,6 +2,7 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using FluentAssertions;
 using Moq;
@@ -17,6 +18,8 @@ public class RequestStepUpTokenCommandHandlerTests
     private readonly Mock<IUsedTotpCodeRepository> _usedCodes = new();
     private readonly Mock<ITotpProvider> _totp = new();
     private readonly Mock<IJwtTokenGenerator> _jwt = new();
+    private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
+    private readonly Mock<IRequestContextAccessor> _requestContext = new();
     private readonly Mock<IClock> _clock = new();
 
     public RequestStepUpTokenCommandHandlerTests()
@@ -25,7 +28,7 @@ public class RequestStepUpTokenCommandHandlerTests
     }
 
     private RequestStepUpTokenCommandHandler CreateHandler() =>
-        new(_credentials.Object, _usedCodes.Object, _totp.Object, _jwt.Object, _clock.Object);
+        new(_credentials.Object, _usedCodes.Object, _totp.Object, _jwt.Object, _auditLog.Object, _requestContext.Object, _clock.Object);
 
     private void SetUpEnabledCredential(string secret = "SECRET123") =>
         _credentials.Setup(x => x.GetByUserIdAsync(User, It.IsAny<CancellationToken>()))
@@ -84,5 +87,38 @@ public class RequestStepUpTokenCommandHandlerTests
 
         await act.Should().ThrowAsync<InvalidTotpCodeException>();
         _usedCodes.Verify(x => x.Add(It.IsAny<UsedTotpCode>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_records_a_successful_audit_event_when_the_code_verifies()
+    {
+        SetUpEnabledCredential();
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "123456", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode("SECRET123", "123456")).Returns(true);
+        _jwt.Setup(x => x.GenerateStepUpToken(User, StepUpOperation.HighValueTransfer))
+            .Returns(new AccessToken("step-up-jwt", Now.AddMinutes(5)));
+        var handler = CreateHandler();
+
+        await handler.Handle(new RequestStepUpTokenCommand(User, StepUpOperation.HighValueTransfer, "123456"), CancellationToken.None);
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.StepUpToken && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_records_a_failed_audit_event_when_the_code_fails_to_verify()
+    {
+        SetUpEnabledCredential();
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "000000", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(new RequestStepUpTokenCommand(User, StepUpOperation.HighValueTransfer, "000000"), CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidTotpCodeException>();
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.StepUpToken && !e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

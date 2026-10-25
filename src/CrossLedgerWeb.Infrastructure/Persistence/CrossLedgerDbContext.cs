@@ -3,6 +3,7 @@ using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Fx;
 using CrossLedgerWeb.Domain.Otc;
 using CrossLedgerWeb.Domain.Payments;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.Wallets;
 using CrossLedgerWeb.Infrastructure.Identity;
 using CrossLedgerWeb.Infrastructure.Persistence.Configurations;
@@ -43,6 +44,7 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
     public DbSet<Card> Cards => Set<Card>();
     public DbSet<CardPurchase> CardPurchases => Set<CardPurchase>();
+    public DbSet<SecurityAuditEvent> SecurityAuditEvents => Set<SecurityAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

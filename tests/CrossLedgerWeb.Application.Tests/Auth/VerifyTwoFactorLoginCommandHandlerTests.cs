@@ -2,6 +2,7 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Auth;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using FluentAssertions;
 using Moq;
@@ -19,6 +20,8 @@ public class VerifyTwoFactorLoginCommandHandlerTests
     private readonly Mock<IUsedTotpCodeRepository> _usedCodes = new();
     private readonly Mock<ITotpProvider> _totp = new();
     private readonly Mock<ILoginTokenIssuer> _tokenIssuer = new();
+    private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
+    private readonly Mock<IRequestContextAccessor> _requestContext = new();
     private readonly Mock<IClock> _clock = new();
 
     public VerifyTwoFactorLoginCommandHandlerTests()
@@ -31,8 +34,9 @@ public class VerifyTwoFactorLoginCommandHandlerTests
             .Returns(new LoginResult("jwt", Now.AddMinutes(15), "refresh", Now.AddDays(30)));
     }
 
-    private VerifyTwoFactorLoginCommandHandler CreateHandler() =>
-        new(_challengeValidator.Object, _identity.Object, _credentials.Object, _usedCodes.Object, _totp.Object, _tokenIssuer.Object, _clock.Object);
+    private VerifyTwoFactorLoginCommandHandler CreateHandler() => new(
+        _challengeValidator.Object, _identity.Object, _credentials.Object, _usedCodes.Object, _totp.Object, _tokenIssuer.Object,
+        _auditLog.Object, _requestContext.Object, _clock.Object);
 
     [Fact]
     public async Task Handle_issues_tokens_when_the_totp_code_verifies()
@@ -119,5 +123,38 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         var act = () => handler.Handle(new VerifyTwoFactorLoginCommand("bad-token", TwoFactorMethods.Totp, "123456"), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidTwoFactorChallengeException>();
+    }
+
+    [Fact]
+    public async Task Handle_records_a_successful_audit_event_when_the_totp_code_verifies()
+    {
+        var credential = new TwoFactorCredential(TwoFactorCredentialId.New(), User, "SECRET", Now);
+        _credentials.Setup(x => x.GetByUserIdAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "123456", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode("SECRET", "123456")).Returns(true);
+        var handler = CreateHandler();
+
+        await handler.Handle(new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.Totp, "123456"), CancellationToken.None);
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.TwoFactorChallenge && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_records_a_failed_audit_event_when_the_totp_code_is_wrong()
+    {
+        var credential = new TwoFactorCredential(TwoFactorCredentialId.New(), User, "SECRET", Now);
+        _credentials.Setup(x => x.GetByUserIdAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "000000", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode("SECRET", "000000")).Returns(false);
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.Totp, "000000"), CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidTwoFactorCodeException>();
+
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.TwoFactorChallenge && !e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

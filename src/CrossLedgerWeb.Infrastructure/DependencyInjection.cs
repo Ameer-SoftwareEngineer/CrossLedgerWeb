@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<ITwoFactorCredentialRepository, TwoFactorCredentialRepository>();
         services.AddScoped<IRecoveryCodeRepository, RecoveryCodeRepository>();
         services.AddScoped<IUsedTotpCodeRepository, UsedTotpCodeRepository>();
+        services.AddScoped<ISecurityAuditLogRepository, SecurityAuditLogRepository>();
         services.AddScoped<ISmsSender, DevLogSmsSender>();
         services.AddScoped<IEmailSender, DevLogEmailSender>();
     }
