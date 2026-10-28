@@ -130,4 +130,18 @@ public sealed class AdminController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>Specification 4.1's usp_ReconcileLedger, run on demand - there is no
+    /// scheduled job wired up yet to call this nightly (specification 3.7's Azure
+    /// Functions milestone), so an admin triggers the integrity check by hand.</summary>
+    [HttpGet("ledger-reconciliation")]
+    [ProducesResponseType<IReadOnlyList<LedgerImbalanceResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LedgerImbalanceResponse>>> ReconcileLedger(CancellationToken cancellationToken)
+    {
+        var imbalances = await _mediator.Send(new ReconcileLedgerQuery(), cancellationToken);
+
+        var response = imbalances.Select(i => new LedgerImbalanceResponse(i.CurrencyCode, i.NetAmount)).ToList();
+
+        return Ok(response);
+    }
 }

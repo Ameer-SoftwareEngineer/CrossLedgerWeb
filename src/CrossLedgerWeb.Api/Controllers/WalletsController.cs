@@ -96,4 +96,28 @@ public sealed class WalletsController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>Specification 4.1's usp_GetAccountStatement - an opening balance plus a
+    /// running balance per entry, computed in SQL via a window function rather than
+    /// accumulated here. Same 404-for-both convention as GetTransactions.</summary>
+    [HttpGet("{walletId:guid}/statement")]
+    [ProducesResponseType<AccountStatementResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountStatementResponse>> GetStatement(
+        Guid walletId, [FromQuery] DateTimeOffset fromDate, [FromQuery] DateTimeOffset toDate, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var statement = await _mediator.Send(new GetAccountStatementQuery(new WalletId(walletId), userId, fromDate, toDate), cancellationToken);
+
+        var response = new AccountStatementResponse(
+            statement.Currency.Code,
+            statement.OpeningBalance,
+            statement.Entries
+                .Select(e => new AccountStatementEntryResponse(
+                    e.Id.Value, e.TransferId.Value, e.Direction.ToString(), e.Amount.Amount, e.PostedAt, e.RunningBalance))
+                .ToList());
+
+        return Ok(response);
+    }
 }

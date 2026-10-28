@@ -31,5 +31,15 @@ public sealed class WalletRepository : IWalletRepository
         return match?.OwnerId;
     }
 
+    public async Task<WalletOwnership?> GetOwnershipAsync(WalletId id, CancellationToken cancellationToken)
+    {
+        var match = await _db.Wallets.AsNoTracking()
+            .Where(w => w.Id == id)
+            .Select(w => new { w.OwnerId, w.Currency })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return match is null ? null : new WalletOwnership(match.OwnerId, match.Currency);
+    }
+
     public void Add(Wallet wallet) => _db.Wallets.Add(wallet);
 }
