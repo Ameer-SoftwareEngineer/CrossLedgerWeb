@@ -40,6 +40,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             OtcRequestNotFoundException => (StatusCodes.Status404NotFound, "OTC request not found", "OTC_REQUEST_NOT_FOUND"),
             InvalidOtcRequestStateException => (StatusCodes.Status409Conflict, "OTC request already resolved", "OTC_REQUEST_ALREADY_RESOLVED"),
             CardNotFoundException => (StatusCodes.Status404NotFound, "Card not found", "CARD_NOT_FOUND"),
+            TrustedDeviceNotFoundException => (StatusCodes.Status404NotFound, "Trusted device not found", "TRUSTED_DEVICE_NOT_FOUND"),
             InvalidCardStateException => (StatusCodes.Status409Conflict, "Card does not allow this action", "INVALID_CARD_STATE"),
             CardSpendingLimitExceededException => (StatusCodes.Status409Conflict, "Card spending limit exceeded", "CARD_SPENDING_LIMIT_EXCEEDED"),
             MerchantSettlementWalletNotConfiguredException => (StatusCodes.Status500InternalServerError, "Merchant settlement wallet not configured", "MERCHANT_SETTLEMENT_WALLET_MISSING"),

@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application.Auth;
+using CrossLedgerWeb.Domain.ValueObjects;
 using CrossLedgerWeb.Shared.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -114,9 +115,39 @@ public sealed class TwoFactorController : ControllerBase
     public async Task<ActionResult<TokenResponse>> VerifyLogin(VerifyTwoFactorLoginRequest request, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(
-            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Method, request.Code), cancellationToken);
+            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Method, request.Code, request.RememberDevice), cancellationToken);
 
         return Ok(ToTokenResponse(result));
+    }
+
+    // ---- Trusted devices (specification 6.1) - viewing and revoking your own grants
+    // requires a full access token, unlike the AllowAnonymous login endpoints above. ----
+
+    [HttpGet("trusted-devices")]
+    [ProducesResponseType<IReadOnlyList<TrustedDeviceResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TrustedDeviceResponse>>> ListTrustedDevices(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var devices = await _mediator.Send(new ListMyTrustedDevicesQuery(userId), cancellationToken);
+
+        var response = devices
+            .Select(d => new TrustedDeviceResponse(d.Id.Value, d.DeviceLabel, d.CreatedAt, d.LastUsedAt, d.ExpiresAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
+    [HttpDelete("trusted-devices/{deviceId:guid}")]
+    public async Task<IActionResult> RevokeTrustedDevice(Guid deviceId, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        await _mediator.Send(new RevokeTrustedDeviceCommand(userId, new TrustedDeviceId(deviceId)), cancellationToken);
+
+        return NoContent();
     }
 
     [HttpPost("login/totp/begin")]
@@ -143,5 +174,5 @@ public sealed class TwoFactorController : ControllerBase
     }
 
     private static TokenResponse ToTokenResponse(LoginResult result) =>
-        new(result.AccessToken, result.AccessTokenExpiresAt, result.RefreshToken, result.RefreshTokenExpiresAt);
+        new(result.AccessToken, result.AccessTokenExpiresAt, result.RefreshToken, result.RefreshTokenExpiresAt, result.TrustedDeviceToken);
 }

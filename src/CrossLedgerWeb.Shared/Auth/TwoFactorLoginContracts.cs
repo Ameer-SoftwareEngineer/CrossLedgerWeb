@@ -9,8 +9,9 @@ public sealed record LoginChallengeResponse(
 
 public sealed record SendLoginSmsCodeRequest(string ChallengeToken);
 
-/// <summary>Method is "Totp" or "Sms".</summary>
-public sealed record VerifyTwoFactorLoginRequest(string ChallengeToken, string Method, string Code);
+/// <summary>Method is "Totp", "Sms" or "TrustedDevice". RememberDevice only has an
+/// effect on the Totp/Sms branches - see VerifyTwoFactorLoginCommand.</summary>
+public sealed record VerifyTwoFactorLoginRequest(string ChallengeToken, string Method, string Code, bool RememberDevice = false);
 
 public sealed record BeginTwoFactorLoginTotpSetupRequest(string ChallengeToken);
 

@@ -14,6 +14,7 @@ namespace CrossLedgerWeb.Application.Auth;
 public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyTwoFactorLoginCommand, LoginResult>
 {
     private static readonly TimeSpan UsedCodeRetention = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan TrustedDeviceValidity = TimeSpan.FromDays(30);
 
     private readonly ITwoFactorChallengeTokenValidator _challengeValidator;
     private readonly IIdentityService _identity;
@@ -21,6 +22,7 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
     private readonly IUsedTotpCodeRepository _usedCodes;
     private readonly ITotpProvider _totp;
     private readonly ILoginTokenIssuer _tokenIssuer;
+    private readonly ITrustedDeviceRepository _trustedDevices;
     private readonly ISecurityAuditLogRepository _auditLog;
     private readonly IRequestContextAccessor _requestContext;
     private readonly IClock _clock;
@@ -32,6 +34,7 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
         IUsedTotpCodeRepository usedCodes,
         ITotpProvider totp,
         ILoginTokenIssuer tokenIssuer,
+        ITrustedDeviceRepository trustedDevices,
         ISecurityAuditLogRepository auditLog,
         IRequestContextAccessor requestContext,
         IClock clock)
@@ -42,6 +45,7 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
         _usedCodes = usedCodes;
         _totp = totp;
         _tokenIssuer = tokenIssuer;
+        _trustedDevices = trustedDevices;
         _auditLog = auditLog;
         _requestContext = requestContext;
         _clock = clock;
@@ -54,14 +58,13 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
             throw new InvalidTwoFactorChallengeException();
 
         var userId = validation.UserId!.Value;
+        var now = _clock.UtcNow;
 
         if (request.Method == TwoFactorMethods.Totp)
         {
             var credential = await _credentials.GetByUserIdAsync(userId, cancellationToken);
             if (credential is null || !credential.IsEnabled)
                 throw new TwoFactorNotEnabledException();
-
-            var now = _clock.UtcNow;
 
             if (await _usedCodes.IsActiveAsync(userId, request.Code, now, cancellationToken))
             {
@@ -86,6 +89,17 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
                 throw new InvalidTwoFactorCodeException();
             }
         }
+        else if (request.Method == TwoFactorMethods.TrustedDevice)
+        {
+            var device = await _trustedDevices.GetByTokenHashAsync(RefreshTokenGenerator.Hash(request.Code), cancellationToken);
+            if (device is null || device.UserId != userId || !device.IsActive(now))
+            {
+                await RecordAsync(userId, succeeded: false, "InvalidOrExpiredTrustedDevice", cancellationToken);
+                throw new InvalidTwoFactorCodeException();
+            }
+
+            device.MarkUsed(now);
+        }
         else
         {
             throw new InvalidTwoFactorCodeException();
@@ -96,7 +110,28 @@ public sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<VerifyT
         var profile = await _identity.GetProfileAsync(userId, cancellationToken)
             ?? throw new InvalidCredentialsException();
 
-        return _tokenIssuer.IssueTokens(userId, profile.Email, profile.Roles);
+        var result = _tokenIssuer.IssueTokens(userId, profile.Email, profile.Roles);
+
+        // Only offered after an explicit Totp/Sms verification, never re-granted from an
+        // already-trusted device - a 30-day grant is a fixed window from when the user
+        // opted in, not a sliding one that silently renews itself forever.
+        if (request.RememberDevice && request.Method != TwoFactorMethods.TrustedDevice)
+        {
+            var rawToken = RefreshTokenGenerator.GenerateRawToken();
+            var deviceLabel = TrustedDeviceLabeler.Describe(_requestContext.UserAgent);
+            var device = new TrustedDevice(
+                TrustedDeviceId.New(), userId, RefreshTokenGenerator.Hash(rawToken), deviceLabel, now, TrustedDeviceValidity);
+            _trustedDevices.Add(device);
+            result = result with { TrustedDeviceToken = rawToken };
+
+            await _auditLog.RecordAsync(
+                new SecurityAuditEvent(
+                    SecurityAuditEventId.New(), userId, deviceLabel, SecurityEventType.TrustedDeviceGranted, succeeded: true,
+                    failureReason: null, _requestContext.IpAddress, _requestContext.UserAgent, now),
+                cancellationToken);
+        }
+
+        return result;
     }
 
     private Task RecordAsync(UserId userId, bool succeeded, string? failureReason, CancellationToken cancellationToken) =>

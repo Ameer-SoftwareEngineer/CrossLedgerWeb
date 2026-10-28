@@ -37,6 +37,7 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<RoutingDecisionRecord> RoutingDecisions => Set<RoutingDecisionRecord>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<TrustedDevice> TrustedDevices => Set<TrustedDevice>();
     public DbSet<TwoFactorCredential> TwoFactorCredentials => Set<TwoFactorCredential>();
     public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
     public DbSet<UsedTotpCode> UsedTotpCodes => Set<UsedTotpCode>();

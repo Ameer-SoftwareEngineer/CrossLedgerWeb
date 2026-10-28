@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ITrustedDeviceRepository, TrustedDeviceRepository>();
 
         services.AddScoped<ITotpProvider, TotpProvider>();
         services.AddScoped<ITwoFactorCredentialRepository, TwoFactorCredentialRepository>();

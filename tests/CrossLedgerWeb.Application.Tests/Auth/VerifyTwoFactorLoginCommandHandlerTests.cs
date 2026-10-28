@@ -20,6 +20,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
     private readonly Mock<IUsedTotpCodeRepository> _usedCodes = new();
     private readonly Mock<ITotpProvider> _totp = new();
     private readonly Mock<ILoginTokenIssuer> _tokenIssuer = new();
+    private readonly Mock<ITrustedDeviceRepository> _trustedDevices = new();
     private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
     private readonly Mock<IRequestContextAccessor> _requestContext = new();
     private readonly Mock<IClock> _clock = new();
@@ -36,7 +37,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
 
     private VerifyTwoFactorLoginCommandHandler CreateHandler() => new(
         _challengeValidator.Object, _identity.Object, _credentials.Object, _usedCodes.Object, _totp.Object, _tokenIssuer.Object,
-        _auditLog.Object, _requestContext.Object, _clock.Object);
+        _trustedDevices.Object, _auditLog.Object, _requestContext.Object, _clock.Object);
 
     [Fact]
     public async Task Handle_issues_tokens_when_the_totp_code_verifies()
@@ -156,5 +157,67 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         _auditLog.Verify(x => x.RecordAsync(
             It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.TwoFactorChallenge && !e.Succeeded),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_issues_tokens_when_a_trusted_device_token_is_active_and_belongs_to_the_user()
+    {
+        var device = new TrustedDevice(TrustedDeviceId.New(), User, RefreshTokenGenerator.Hash("raw-device-token"), "Chrome on Windows", Now.AddDays(-1), TimeSpan.FromDays(30));
+        _trustedDevices.Setup(x => x.GetByTokenHashAsync(RefreshTokenGenerator.Hash("raw-device-token"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(device);
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(
+            new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.TrustedDevice, "raw-device-token"), CancellationToken.None);
+
+        result.AccessToken.Should().Be("jwt");
+        device.LastUsedAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_trusted_device_token_is_unknown_expired_or_belongs_to_another_user()
+    {
+        _trustedDevices.Setup(x => x.GetByTokenHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((TrustedDevice?)null);
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(
+            new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.TrustedDevice, "stale-token"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidTwoFactorCodeException>();
+    }
+
+    [Fact]
+    public async Task Handle_issues_a_trusted_device_grant_when_remember_device_is_set_on_a_totp_verification()
+    {
+        var credential = new TwoFactorCredential(TwoFactorCredentialId.New(), User, "SECRET", Now);
+        _credentials.Setup(x => x.GetByUserIdAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "123456", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode("SECRET", "123456")).Returns(true);
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(
+            new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.Totp, "123456", RememberDevice: true), CancellationToken.None);
+
+        result.TrustedDeviceToken.Should().NotBeNullOrEmpty();
+        _trustedDevices.Verify(x => x.Add(It.Is<TrustedDevice>(d => d.UserId == User)), Times.Once);
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == User && e.EventType == SecurityEventType.TrustedDeviceGranted && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_does_not_issue_a_trusted_device_grant_when_remember_device_is_not_set()
+    {
+        var credential = new TwoFactorCredential(TwoFactorCredentialId.New(), User, "SECRET", Now);
+        _credentials.Setup(x => x.GetByUserIdAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        _usedCodes.Setup(x => x.IsActiveAsync(User, "123456", Now, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _totp.Setup(x => x.VerifyCode("SECRET", "123456")).Returns(true);
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(
+            new VerifyTwoFactorLoginCommand("valid-challenge", TwoFactorMethods.Totp, "123456"), CancellationToken.None);
+
+        result.TrustedDeviceToken.Should().BeNull();
+        _trustedDevices.Verify(x => x.Add(It.IsAny<TrustedDevice>()), Times.Never);
     }
 }
