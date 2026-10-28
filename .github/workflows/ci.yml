@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore CrossLedgerWeb.sln
+
+      - name: Build
+        run: dotnet build CrossLedgerWeb.sln --no-restore --configuration Release
+
+      # Domain + Application + Integration - CrossLedgerWeb.LoadTests is an NBomber exe,
+      # not a test project, so `dotnet test` on the solution naturally skips it.
+      # Integration.Tests runs Dapper reads and EF persistence tests against SQLite, not
+      # SQL Server, so no database service container is needed here.
+      - name: Test
+        run: >
+          dotnet test CrossLedgerWeb.sln
+          --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+          --logger "trx"
+          --logger "GitHubActions"
+
+      - name: Install ReportGenerator
+        if: always()
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        if: always()
+        run: >
+          reportgenerator
+          -reports:"TestResults/**/coverage.cobertura.xml"
+          -targetdir:"CoverageReport"
+          -reporttypes:"MarkdownSummaryGithub;Html"
+          -classfilters:"-*.Migrations.*"
+
+      - name: Publish coverage summary
+        if: always()
+        run: cat CoverageReport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          retention-days: 14
