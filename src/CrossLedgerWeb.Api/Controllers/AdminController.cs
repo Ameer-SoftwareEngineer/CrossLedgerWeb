@@ -144,4 +144,34 @@ public sealed class AdminController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>Specification 4.1's usp_GetWalletBalance - a raw-SQL cross-check against
+    /// the EF-derived Wallet.Balance, independent of the aggregate.</summary>
+    [HttpGet("wallets/{walletId:guid}/balance")]
+    [ProducesResponseType<WalletBalanceResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<WalletBalanceResponse>> GetWalletBalance(Guid walletId, CancellationToken cancellationToken)
+    {
+        var balance = await _mediator.Send(new GetWalletBalanceQuery(new WalletId(walletId)), cancellationToken);
+        return Ok(new WalletBalanceResponse(balance.Currency.Code, balance.Balance));
+    }
+
+    /// <summary>Specification 4.1's usp_PostTransfer - an admin-only direct transfer
+    /// between two wallets, posted atomically through the stored procedure rather than a
+    /// Quote. For support/ops corrections; the regular customer transfer flow is
+    /// unaffected.</summary>
+    [HttpPost("manual-transfer")]
+    [ProducesResponseType<ManualTransferResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ManualTransferResponse>> PostManualTransfer(
+        ManualTransferRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(
+            new ManualTransferCommand(
+                new WalletId(request.SourceWalletId), new WalletId(request.TargetWalletId),
+                request.SourceAmount, request.TargetAmount, idempotencyKey),
+            cancellationToken);
+
+        return Ok(new ManualTransferResponse(result.TransferId.Value, result.PostedAt));
+    }
 }

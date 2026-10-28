@@ -8,26 +8,30 @@ namespace CrossLedgerWeb.Application.Transfers;
 
 /// <summary>
 /// Mirrors the request flow in specification section 7.1: load the quote and wallets,
-/// then let the domain post the four ledger entries. Validation, idempotency and the
-/// atomic commit (entries + idempotency record together) are pipeline behaviours, not
-/// this handler's concern - it only stages domain changes on the tracked entities.
+/// run the AML rolling-limit pre-check (dbo.usp_CheckTransferLimits), then let the
+/// domain post the four ledger entries. Validation, idempotency and the atomic commit
+/// (entries + idempotency record together) are pipeline behaviours, not this handler's
+/// concern - it only stages domain changes on the tracked entities.
 /// </summary>
 public sealed class CreateTransferCommandHandler : IRequestHandler<CreateTransferCommand, CreateTransferResult>
 {
     private readonly IQuoteRepository _quotes;
     private readonly IWalletRepository _wallets;
     private readonly IFxSettlementWalletResolver _fxSettlementWallets;
+    private readonly ITransferLimitsReader _transferLimits;
     private readonly IClock _clock;
 
     public CreateTransferCommandHandler(
         IQuoteRepository quotes,
         IWalletRepository wallets,
         IFxSettlementWalletResolver fxSettlementWallets,
+        ITransferLimitsReader transferLimits,
         IClock clock)
     {
         _quotes = quotes;
         _wallets = wallets;
         _fxSettlementWallets = fxSettlementWallets;
+        _transferLimits = transferLimits;
         _clock = clock;
     }
 
@@ -41,6 +45,11 @@ public sealed class CreateTransferCommandHandler : IRequestHandler<CreateTransfe
 
         var targetWallet = await _wallets.GetByIdAsync(request.TargetWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.TargetWalletId);
+
+        var limitCheck = await _transferLimits.CheckAsync(
+            sourceWallet.OwnerId, quote.FromCurrency, request.SourceAmount, cancellationToken);
+        if (limitCheck.ExceedsLimit)
+            throw new TransferLimitExceededException(sourceWallet.OwnerId, quote.FromCurrency, limitCheck.ProjectedTotal, limitCheck.RollingLimit);
 
         var fxSettlementSource = await _fxSettlementWallets.GetSettlementWalletAsync(quote.FromCurrency, cancellationToken);
         var fxSettlementTarget = await _fxSettlementWallets.GetSettlementWalletAsync(quote.ToCurrency, cancellationToken);

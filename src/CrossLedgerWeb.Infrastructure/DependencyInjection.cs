@@ -3,6 +3,7 @@ using CrossLedgerWeb.Application.Payments;
 using CrossLedgerWeb.Infrastructure.Cards;
 using CrossLedgerWeb.Infrastructure.Fx;
 using CrossLedgerWeb.Infrastructure.Identity;
+using CrossLedgerWeb.Infrastructure.Ledger;
 using CrossLedgerWeb.Infrastructure.Persistence;
 using CrossLedgerWeb.Infrastructure.Reporting;
 using CrossLedgerWeb.Infrastructure.Repositories;
@@ -41,6 +42,9 @@ public static class DependencyInjection
         services.AddScoped<IFxRateOhlcReader, FxRateOhlcReader>();
         services.AddScoped<IAccountStatementReader, AccountStatementReader>();
         services.AddScoped<ILedgerReconciliationReader, LedgerReconciliationReader>();
+        services.AddScoped<ITransferLimitsReader, TransferLimitsReader>();
+        services.AddScoped<IWalletBalanceReader, WalletBalanceReader>();
+        services.AddScoped<IManualTransferPoster, ManualTransferPoster>();
         services.AddSingleton<IClock, SystemClock>();
 
         // CrossLedgerWebDbContext needs IDataProtectionProvider to encrypt TOTP secrets at

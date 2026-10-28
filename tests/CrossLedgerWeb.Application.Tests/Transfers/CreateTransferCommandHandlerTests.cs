@@ -21,6 +21,7 @@ public class CreateTransferCommandHandlerTests
     private readonly Mock<IQuoteRepository> _quotes = new();
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<IFxSettlementWalletResolver> _fxSettlementWallets = new();
+    private readonly Mock<ITransferLimitsReader> _transferLimits = new();
     private readonly Mock<IClock> _clock = new();
 
     private readonly Wallet _sourceWallet;
@@ -43,11 +44,14 @@ public class CreateTransferCommandHandlerTests
         _wallets.Setup(x => x.GetByIdAsync(_targetWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_targetWallet);
         _fxSettlementWallets.Setup(x => x.GetSettlementWalletAsync(Usd, It.IsAny<CancellationToken>())).ReturnsAsync(_fxSettlementUsd);
         _fxSettlementWallets.Setup(x => x.GetSettlementWalletAsync(Pkr, It.IsAny<CancellationToken>())).ReturnsAsync(_fxSettlementPkr);
+        _transferLimits
+            .Setup(x => x.CheckAsync(It.IsAny<UserId>(), It.IsAny<Currency>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TransferLimitCheck(0m, 0m, 10_000m, ExceedsLimit: false));
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
 
     private CreateTransferCommandHandler CreateHandler() => new(
-        _quotes.Object, _wallets.Object, _fxSettlementWallets.Object, _clock.Object);
+        _quotes.Object, _wallets.Object, _fxSettlementWallets.Object, _transferLimits.Object, _clock.Object);
 
     private CreateTransferCommand ValidCommand(decimal sourceAmount = 100m) => new(
         _quote.Id, _sourceWallet.Id, _targetWallet.Id, sourceAmount, "idem-key-1");
@@ -106,6 +110,19 @@ public class CreateTransferCommandHandlerTests
         var act = () => handler.Handle(ValidCommand(sourceAmount: 500m), CancellationToken.None);
 
         await act.Should().ThrowAsync<InsufficientFundsException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_rolling_transfer_limit_is_exceeded()
+    {
+        _transferLimits
+            .Setup(x => x.CheckAsync(_sourceWallet.OwnerId, Usd, 100m, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TransferLimitCheck(9_950m, 10_050m, 10_000m, ExceedsLimit: true));
+        var handler = CreateHandler();
+
+        var act = () => handler.Handle(ValidCommand(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<TransferLimitExceededException>();
     }
 
     [Fact]

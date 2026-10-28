@@ -46,6 +46,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             MerchantSettlementWalletNotConfiguredException => (StatusCodes.Status500InternalServerError, "Merchant settlement wallet not configured", "MERCHANT_SETTLEMENT_WALLET_MISSING"),
             InsufficientFundsException => (StatusCodes.Status409Conflict, "Insufficient funds", "INSUFFICIENT_FUNDS"),
             CurrencyMismatchException => (StatusCodes.Status400BadRequest, "Currency mismatch", "CURRENCY_MISMATCH"),
+            TransferLimitExceededException => (StatusCodes.Status409Conflict, "Rolling transfer limit exceeded", "TRANSFER_LIMIT_EXCEEDED"),
             ExchangeRateUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Exchange rate unavailable", "RATE_UNAVAILABLE"),
             SettlementWalletNotConfiguredException => (StatusCodes.Status500InternalServerError, "Settlement wallet not configured", "SETTLEMENT_WALLET_MISSING"),
             RegistrationFailedException => (StatusCodes.Status400BadRequest, "Registration failed", "REGISTRATION_FAILED"),
