@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
+using CrossLedgerWeb.Api.BackgroundJobs;
 using CrossLedgerWeb.Api.ExceptionHandling;
 using CrossLedgerWeb.Api.RealTime;
 using CrossLedgerWeb.Api.Security;
@@ -50,6 +51,7 @@ builder.Services.AddScoped<IRequestContextAccessor, HttpRequestContextAccessor>(
 
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<FxRateBroadcastService>();
+builder.Services.AddHostedService<LedgerReconciliationBackgroundService>();
 
 // CrossLedgerFrontend runs on its own origin (a separate repo, a separate dev server
 // port) - without this, the browser blocks every call the Blazor WASM app makes here.
