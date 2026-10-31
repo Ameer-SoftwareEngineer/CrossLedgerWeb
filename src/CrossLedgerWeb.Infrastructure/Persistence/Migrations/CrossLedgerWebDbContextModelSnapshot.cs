@@ -552,6 +552,11 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TransferId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
                     b.ComplexProperty<Dictionary<string, object>>("Amount", "CrossLedgerWeb.Domain.Payments.Payout.Amount#Money", b1 =>
                         {
                             b1.Property<decimal>("Amount")
@@ -572,6 +577,8 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProviderCode", "ProviderReference")
                         .IsUnique()
                         .HasFilter("[ProviderReference] IS NOT NULL");
+
+                    b.HasIndex("ProviderCode", "UpdatedAt");
 
                     b.ToTable("Payouts", (string)null);
                 });

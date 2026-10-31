@@ -47,7 +47,7 @@ public sealed class PaymentRoutingEngine
         foreach (var provider in healthy)
         {
             var quote = await provider.QuoteAsync(request, cancellationToken);
-            var stats = await _stats.GetStatsAsync(provider.Code, cancellationToken);
+            var stats = await _stats.GetStatsAsync(provider.Code, request.Amount.Currency, cancellationToken);
             scored.Add(new ScoredProviderQuote(quote, _scorer.Score(quote, stats, request.Preference)));
         }
 

@@ -33,7 +33,7 @@ public class ExecutePayoutCommandHandlerTests
 
         _wallets.Setup(x => x.GetByIdAsync(_sourceWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_sourceWallet);
         _reserveWallets.Setup(x => x.GetPayoutReserveWalletAsync(Usd, It.IsAny<CancellationToken>())).ReturnsAsync(_reserveWallet);
-        _stats.Setup(x => x.GetStatsAsync(It.IsAny<ProviderCode>(), It.IsAny<CancellationToken>())).ReturnsAsync(ProviderStats.Unknown);
+        _stats.Setup(x => x.GetStatsAsync(It.IsAny<ProviderCode>(), It.IsAny<Currency>(), It.IsAny<CancellationToken>())).ReturnsAsync(ProviderStats.Unknown);
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
 

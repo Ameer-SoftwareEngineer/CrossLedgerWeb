@@ -18,7 +18,7 @@ public class PaymentRoutingEngineTests
 
     public PaymentRoutingEngineTests()
     {
-        _stats.Setup(x => x.GetStatsAsync(It.IsAny<ProviderCode>(), It.IsAny<CancellationToken>()))
+        _stats.Setup(x => x.GetStatsAsync(It.IsAny<ProviderCode>(), It.IsAny<Currency>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ProviderStats.Unknown);
     }
 

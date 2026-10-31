@@ -18,6 +18,7 @@ public sealed class PayoutConfiguration : IEntityTypeConfiguration<Payout>
         builder.Property(p => p.State).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.ProviderCode).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.ProviderReference).HasMaxLength(256);
+        builder.Property(p => p.UpdatedAt).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
 
         // Money is a struct, so it maps as an EF Core 8 complex type (ComplexProperty),
         // not OwnsOne - same reasoning as LedgerEntryConfiguration.
@@ -35,5 +36,10 @@ public sealed class PayoutConfiguration : IEntityTypeConfiguration<Payout>
         builder.HasIndex(p => new { p.ProviderCode, p.ProviderReference })
             .IsUnique()
             .HasFilter("[ProviderReference] IS NOT NULL");
+
+        // usp_GetProviderStats' rolling-24h window filters by exactly these two columns
+        // (specification 5.3) - same indexing rationale as usp_CheckTransferLimits' own
+        // doc comment on Wallets(OwnerId).
+        builder.HasIndex(p => new { p.ProviderCode, p.UpdatedAt });
     }
 }

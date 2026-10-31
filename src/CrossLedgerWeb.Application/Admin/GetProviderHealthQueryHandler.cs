@@ -4,10 +4,10 @@ using MediatR;
 namespace CrossLedgerWeb.Application.Admin;
 
 /// <summary>Calls every registered provider's own CheckHealthAsync live - deliberately
-/// not IProviderStatsProvider, which is a routing-score placeholder that always reports
-/// full marks (it needs persisted payout-outcome history this project doesn't build yet).
-/// This is genuinely live data, one real call per provider, same as PaymentRoutingEngine's
-/// own health filter.</summary>
+/// not IProviderStatsProvider, which answers a different question (routing-score history:
+/// rolling success rate and daily headroom, computed from past Payouts) for a specific
+/// currency, not current reachability. This is genuinely live data, one real call per
+/// provider, same as PaymentRoutingEngine's own health filter.</summary>
 public sealed class GetProviderHealthQueryHandler : IRequestHandler<GetProviderHealthQuery, IReadOnlyList<ProviderHealth>>
 {
     private readonly IEnumerable<IPaymentProvider> _providers;

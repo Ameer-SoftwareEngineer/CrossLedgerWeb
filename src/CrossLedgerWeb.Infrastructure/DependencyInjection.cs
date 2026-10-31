@@ -36,7 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IRoutingAuditLog, RoutingAuditLog>();
-        services.AddScoped<IProviderStatsProvider, DefaultProviderStatsProvider>();
+        services.AddScoped<IProviderStatsProvider, ProviderStatsReader>();
         services.AddScoped<ITransactionHistoryReader, TransactionHistoryReader>();
         services.AddScoped<ILedgerEntryReader, LedgerEntryReader>();
         services.AddScoped<IFxRateOhlcReader, FxRateOhlcReader>();

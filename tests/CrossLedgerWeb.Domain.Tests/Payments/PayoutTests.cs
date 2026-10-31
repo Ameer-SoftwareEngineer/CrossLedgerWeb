@@ -126,6 +126,28 @@ public class PayoutTests
     }
 
     [Fact]
+    public void MarkProviderFailed_records_which_provider_was_tried()
+    {
+        var payout = PayoutIn(PayoutState.Submitted);
+
+        payout.MarkProviderFailed(ProviderCode.Rapyd);
+
+        payout.State.Should().Be(PayoutState.ProviderFailed);
+        payout.ProviderCode.Should().Be(ProviderCode.Rapyd);
+    }
+
+    [Fact]
+    public void A_state_transition_bumps_UpdatedAt()
+    {
+        var payout = PayoutIn(PayoutState.Quoted);
+        var before = payout.UpdatedAt;
+
+        payout.Reserve();
+
+        payout.UpdatedAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
     public void Reverse_is_rejected_once_already_reversed()
     {
         var payout = PayoutIn(PayoutState.Reversed);

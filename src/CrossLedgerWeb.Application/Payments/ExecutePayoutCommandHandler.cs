@@ -95,7 +95,7 @@ public sealed class ExecutePayoutCommandHandler : IRequestHandler<ExecutePayoutC
                 return ToResult(payout);
             }
 
-            payout.MarkProviderFailed();
+            payout.MarkProviderFailed(provider.Code);
 
             var isLastCandidate = i == candidates.Count - 1;
             if (isLastCandidate)

@@ -38,14 +38,25 @@ public sealed class Payout
     public Money Amount { get; }
     public PayoutState State { get; private set; }
 
-    /// <summary>Set once a provider has been submitted to (specification 5.4's routing
-    /// chain) - null until then, since a payout may fail over through more than one
-    /// provider before one actually accepts it.</summary>
+    /// <summary>The most recent provider this payout was submitted to, successfully or
+    /// not (specification 5.4's routing chain) - null until the first submission. Only the
+    /// latest attempt is kept: a payout that fails over from Stripe to Rapyd ends up
+    /// recording Rapyd, not Stripe's earlier failure. That is the one gap in computing
+    /// specification 5.3's rolling-success-rate-per-provider directly from this table - see
+    /// Infrastructure's ProviderStatsReader for how that is handled.</summary>
     public ProviderCode? ProviderCode { get; private set; }
 
     /// <summary>The provider's own reference for this attempt, set on acceptance - this is
     /// what an inbound webhook correlates back to a specific Payout.</summary>
     public string? ProviderReference { get; private set; }
+
+    /// <summary>When State last changed - specification 5.3's rolling 24h provider stats
+    /// are windowed against this. An operational bookkeeping timestamp, not a ledger entry
+    /// (see LedgerEntry/Wallet for why those take an explicit postedAt instead): nothing
+    /// downstream needs it to be deterministic, so it is stamped directly from the system
+    /// clock rather than threaded through every transition call site, including the state
+    /// machine's own 64-case theory test.</summary>
+    public DateTimeOffset UpdatedAt { get; private set; }
 
     public Payout(PayoutId id, TransferId transferId, WalletId sourceWalletId, Money amount)
     {
@@ -57,6 +68,7 @@ public sealed class Payout
         SourceWalletId = sourceWalletId;
         Amount = amount;
         State = PayoutState.Quoted;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>Rehydration constructor for EF Core materialization - see LedgerEntry's
@@ -95,8 +107,14 @@ public sealed class Payout
 
     /// <summary>A provider deterministically rejected the payout - the caller fails over
     /// to the next provider in the routing chain (specification 5.4) by calling Submit()
-    /// again once ready, or MarkPendingManual() if the chain is exhausted.</summary>
-    public void MarkProviderFailed() => TransitionTo(PayoutState.ProviderFailed);
+    /// again once ready, or MarkPendingManual() if the chain is exhausted. Records which
+    /// provider this was, same as MarkAccepted, so a payout that ultimately lands on
+    /// PendingManual still shows which provider was last tried.</summary>
+    public void MarkProviderFailed(ProviderCode providerCode)
+    {
+        ProviderCode = providerCode;
+        TransitionTo(PayoutState.ProviderFailed);
+    }
 
     /// <summary>Every provider in the chain was exhausted (specification 5.4) - "funds stay
     /// reserved but unspent, and an operations alert is raised."</summary>
@@ -118,6 +136,7 @@ public sealed class Payout
                 throw new InvalidPayoutTransitionException(State, newState);
 
             State = newState;
+            UpdatedAt = DateTimeOffset.UtcNow;
             return;
         }
 
@@ -125,5 +144,6 @@ public sealed class Payout
             throw new InvalidPayoutTransitionException(State, newState);
 
         State = newState;
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }
