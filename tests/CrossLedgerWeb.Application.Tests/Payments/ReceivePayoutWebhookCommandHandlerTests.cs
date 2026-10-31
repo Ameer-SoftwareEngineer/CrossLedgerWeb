@@ -21,6 +21,7 @@ public class ReceivePayoutWebhookCommandHandlerTests
     private readonly Mock<IPayoutRepository> _payouts = new();
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<IPayoutReserveWalletResolver> _reserveWallets = new();
+    private readonly Mock<IWebhookNotifier> _webhookNotifier = new();
     private readonly Mock<IClock> _clock = new();
 
     private readonly Wallet _sourceWallet;
@@ -48,7 +49,7 @@ public class ReceivePayoutWebhookCommandHandlerTests
     }
 
     private ReceivePayoutWebhookCommandHandler CreateHandler() => new(
-        _processedEvents.Object, _payouts.Object, _wallets.Object, _reserveWallets.Object, _clock.Object);
+        _processedEvents.Object, _payouts.Object, _wallets.Object, _reserveWallets.Object, _webhookNotifier.Object, _clock.Object);
 
     private static ReceivePayoutWebhookCommand Command(PayoutWebhookEventType eventType) => new(
         ProviderCode.Simulated, EventId, ProviderReference, eventType);
@@ -79,6 +80,7 @@ public class ReceivePayoutWebhookCommandHandlerTests
         result.WasDuplicate.Should().BeFalse();
         result.PayoutState.Should().Be(PayoutState.Settled);
         _processedEvents.Verify(x => x.MarkProcessed(ProviderCode.Simulated, EventId, Now), Times.Once);
+        _webhookNotifier.Verify(x => x.NotifyAsync("payout.settled", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

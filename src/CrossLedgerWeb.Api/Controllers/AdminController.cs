@@ -112,6 +112,22 @@ public sealed class AdminController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("webhook-deliveries")]
+    [ProducesResponseType<WebhookDeliveryPageResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<WebhookDeliveryPageResponse>> ListWebhookDeliveries(
+        [FromQuery] int pageNumber, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var page = await _mediator.Send(new ListWebhookDeliveriesQuery(pageNumber, pageSize), cancellationToken);
+
+        var response = new WebhookDeliveryPageResponse(
+            page.Entries.Select(e => new WebhookDeliveryResponse(e.EventType, e.SubscriberUrl, e.Succeeded, e.ResponseStatusCode, e.AttemptCount, e.AttemptedAt)).ToList(),
+            page.TotalCount,
+            page.PageNumber,
+            page.PageSize);
+
+        return Ok(response);
+    }
+
     [HttpGet("security-events")]
     [ProducesResponseType<SecurityAuditEventPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SecurityAuditEventPageResponse>> ListSecurityEvents(

@@ -7,6 +7,7 @@ using CrossLedgerWeb.Infrastructure.Ledger;
 using CrossLedgerWeb.Infrastructure.Persistence;
 using CrossLedgerWeb.Infrastructure.Reporting;
 using CrossLedgerWeb.Infrastructure.Repositories;
+using CrossLedgerWeb.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -46,6 +47,9 @@ public static class DependencyInjection
         services.AddScoped<IWalletBalanceReader, WalletBalanceReader>();
         services.AddScoped<IManualTransferPoster, ManualTransferPoster>();
         services.AddSingleton<IClock, SystemClock>();
+
+        services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));
+        services.AddHttpClient<IWebhookNotifier, WebhookNotifier>();
 
         // CrossLedgerWebDbContext needs IDataProtectionProvider to encrypt TOTP secrets at
         // rest (specification 6.4). Locally this persists keys to the file system; in

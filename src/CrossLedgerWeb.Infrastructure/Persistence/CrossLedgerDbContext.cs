@@ -43,6 +43,7 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     public DbSet<UsedTotpCode> UsedTotpCodes => Set<UsedTotpCode>();
     public DbSet<Payout> Payouts => Set<Payout>();
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<Card> Cards => Set<Card>();
     public DbSet<CardPurchase> CardPurchases => Set<CardPurchase>();
     public DbSet<SecurityAuditEvent> SecurityAuditEvents => Set<SecurityAuditEvent>();

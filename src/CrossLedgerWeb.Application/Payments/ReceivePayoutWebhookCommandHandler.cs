@@ -11,6 +11,7 @@ public sealed class ReceivePayoutWebhookCommandHandler : IRequestHandler<Receive
     private readonly IPayoutRepository _payouts;
     private readonly IWalletRepository _wallets;
     private readonly IPayoutReserveWalletResolver _reserveWallets;
+    private readonly IWebhookNotifier _webhookNotifier;
     private readonly IClock _clock;
 
     public ReceivePayoutWebhookCommandHandler(
@@ -18,12 +19,14 @@ public sealed class ReceivePayoutWebhookCommandHandler : IRequestHandler<Receive
         IPayoutRepository payouts,
         IWalletRepository wallets,
         IPayoutReserveWalletResolver reserveWallets,
+        IWebhookNotifier webhookNotifier,
         IClock clock)
     {
         _processedEvents = processedEvents;
         _payouts = payouts;
         _wallets = wallets;
         _reserveWallets = reserveWallets;
+        _webhookNotifier = webhookNotifier;
         _clock = clock;
     }
 
@@ -59,6 +62,14 @@ public sealed class ReceivePayoutWebhookCommandHandler : IRequestHandler<Receive
         }
 
         _processedEvents.MarkProcessed(request.ProviderCode, request.EventId, now);
+
+        // Specification 2.6: notify CrossLedger's own configured subscriber the way
+        // Stripe and similar providers notify merchants - only once the payout's new
+        // state is final, never for a duplicate we already told them about.
+        await _webhookNotifier.NotifyAsync(
+            $"payout.{payout.State.ToString().ToLowerInvariant()}",
+            new { payoutId = payout.Id.Value, transferId = payout.TransferId.Value, state = payout.State.ToString() },
+            cancellationToken);
 
         return new ReceivePayoutWebhookResult(WasDuplicate: false, payout.State);
     }

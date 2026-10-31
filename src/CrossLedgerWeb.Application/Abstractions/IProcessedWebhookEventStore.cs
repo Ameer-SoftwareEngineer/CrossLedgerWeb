@@ -18,8 +18,7 @@ public interface IProcessedWebhookEventStore
     void MarkProcessed(ProviderCode providerCode, string eventId, DateTimeOffset processedAt);
 
     /// <summary>Backs the Admin Console's webhook log (specification 9) - this is the
-    /// dedup record of inbound provider notifications CrossLedger has already handled,
-    /// not an outbound delivery log (this codebase has no outbound webhook-subscriber
-    /// concept to log).</summary>
+    /// dedup record of inbound provider notifications CrossLedger has already handled.
+    /// The outbound counterpart is IWebhookNotifier.ListRecentAsync.</summary>
     Task<WebhookEventPage> ListRecentAsync(int pageNumber, int pageSize, CancellationToken cancellationToken);
 }
