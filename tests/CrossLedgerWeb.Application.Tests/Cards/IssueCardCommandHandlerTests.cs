@@ -17,16 +17,17 @@ public class IssueCardCommandHandlerTests
 
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<ICardRepository> _cards = new();
-    private readonly Mock<ICardNumberGenerator> _numberGenerator = new();
+    private readonly Mock<ICardIssuer> _cardIssuer = new();
     private readonly Mock<IClock> _clock = new();
 
     public IssueCardCommandHandlerTests()
     {
-        _numberGenerator.Setup(x => x.Generate()).Returns(("4532750123456784", "123"));
+        _cardIssuer.Setup(x => x.IssueAsync(It.IsAny<CardIssuanceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IssuedCardDetails("4532750123456784", "123", Now.Month, Now.Year + 3, StripeCardholderId: null, StripeCardId: null));
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
 
-    private IssueCardCommandHandler CreateHandler() => new(_wallets.Object, _cards.Object, _numberGenerator.Object, _clock.Object);
+    private IssueCardCommandHandler CreateHandler() => new(_wallets.Object, _cards.Object, _cardIssuer.Object, _clock.Object);
 
     private static IssueCardCommand ValidCommand(CardAddress? shippingAddress = null) => new(
         Owner, "USD", CardType.Virtual, "Test Customer", SourceOfFunds.Salary, 5000m, 100000m, true,
@@ -69,5 +70,21 @@ public class IssueCardCommandHandlerTests
 
         staged.Should().NotBeNull();
         staged!.ShippingAddress.Should().Be(TestAddress);
+    }
+
+    [Fact]
+    public async Task Handle_carries_the_issuers_Stripe_identifiers_onto_the_card_when_present()
+    {
+        _cardIssuer.Setup(x => x.IssueAsync(It.IsAny<CardIssuanceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IssuedCardDetails("4532750123456784", "123", 1, 2030, StripeCardholderId: "ich_123", StripeCardId: "ic_123"));
+        var handler = CreateHandler();
+        Card? staged = null;
+        _cards.Setup(x => x.Add(It.IsAny<Card>())).Callback<Card>(c => staged = c);
+
+        await handler.Handle(ValidCommand(), CancellationToken.None);
+
+        staged.Should().NotBeNull();
+        staged!.StripeCardholderId.Should().Be("ich_123");
+        staged.StripeCardId.Should().Be("ic_123");
     }
 }

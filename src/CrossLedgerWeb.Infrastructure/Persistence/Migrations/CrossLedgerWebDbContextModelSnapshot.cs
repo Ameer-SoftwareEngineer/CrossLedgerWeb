@@ -263,6 +263,14 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("StripeCardId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("StripeCardholderId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.ComplexProperty<Dictionary<string, object>>("RegisteredAddress", "CrossLedgerWeb.Domain.Cards.Card.RegisteredAddress#CardAddress", b1 =>
                         {
                             b1.IsRequired();

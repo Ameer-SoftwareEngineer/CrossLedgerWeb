@@ -45,6 +45,13 @@ public sealed class Card
     public CardAddress RegisteredAddress { get; }
     public CardAddress ShippingAddress { get; }
 
+    /// <summary>Null when ICardIssuer issued this card via SimulatedCardIssuer - only set
+    /// when StripeCardIssuer actually created a real Stripe Issuing Cardholder/Card.</summary>
+    public string? StripeCardholderId { get; }
+
+    /// <summary>See StripeCardholderId - the two are always both null or both set.</summary>
+    public string? StripeCardId { get; }
+
     /// <summary>Safe to show without step-up - derived from Pan rather than stored
     /// separately, so there is only ever one place a card's number can drift from its
     /// own last four digits.</summary>
@@ -69,7 +76,9 @@ public sealed class Card
         string? employerCompanyName,
         string? jobTitle,
         CardAddress registeredAddress,
-        CardAddress shippingAddress)
+        CardAddress shippingAddress,
+        string? stripeCardholderId = null,
+        string? stripeCardId = null)
     {
         if (string.IsNullOrWhiteSpace(cardholderName))
             throw new ArgumentException("A card requires a cardholder name.", nameof(cardholderName));
@@ -102,6 +111,8 @@ public sealed class Card
         JobTitle = jobTitle;
         RegisteredAddress = registeredAddress;
         ShippingAddress = shippingAddress;
+        StripeCardholderId = stripeCardholderId;
+        StripeCardId = stripeCardId;
         Status = CardStatus.PendingApproval;
     }
 
@@ -132,7 +143,9 @@ public sealed class Card
         decimal estimatedNetWorth,
         bool isActivelyEmployed,
         string? employerCompanyName,
-        string? jobTitle)
+        string? jobTitle,
+        string? stripeCardholderId,
+        string? stripeCardId)
     {
         Id = id;
         OwnerId = ownerId;
@@ -154,6 +167,8 @@ public sealed class Card
         IsActivelyEmployed = isActivelyEmployed;
         EmployerCompanyName = employerCompanyName;
         JobTitle = jobTitle;
+        StripeCardholderId = stripeCardholderId;
+        StripeCardId = stripeCardId;
         RegisteredAddress = default!;
         ShippingAddress = default!;
     }

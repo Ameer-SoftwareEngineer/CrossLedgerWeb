@@ -52,6 +52,8 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.SpendingLimit).HasColumnType("decimal(18,2)");
         builder.Property(c => c.ClosedAt);
+        builder.Property(c => c.StripeCardholderId).HasMaxLength(255);
+        builder.Property(c => c.StripeCardId).HasMaxLength(255);
 
         // Issuance-intake fields (display/record-keeping only - see Card's own docs).
         builder.Property(c => c.SourceOfFunds).HasConversion<string>().HasMaxLength(30);

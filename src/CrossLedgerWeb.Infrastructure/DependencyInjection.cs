@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace CrossLedgerWeb.Infrastructure;
 
@@ -30,6 +31,12 @@ public static class DependencyInjection
         services.AddScoped<ICardPurchaseRepository, CardPurchaseRepository>();
         services.AddScoped<IMerchantSettlementWalletResolver, MerchantSettlementWalletResolver>();
         services.AddScoped<ICardNumberGenerator, CardNumberGenerator>();
+        services.Configure<CardIssuingOptions>(configuration.GetSection(CardIssuingOptions.SectionName));
+        services.AddScoped<SimulatedCardIssuer>();
+        services.AddScoped<StripeCardIssuer>();
+        services.AddScoped<ICardIssuer>(sp => sp.GetRequiredService<IOptions<CardIssuingOptions>>().Value.UseStripe
+            ? sp.GetRequiredService<StripeCardIssuer>()
+            : sp.GetRequiredService<SimulatedCardIssuer>());
         services.AddScoped<IFxSettlementWalletResolver, FxSettlementWalletResolver>();
         services.AddScoped<IPayoutReserveWalletResolver, PayoutReserveWalletResolver>();
         services.AddScoped<IPayoutRepository, PayoutRepository>();

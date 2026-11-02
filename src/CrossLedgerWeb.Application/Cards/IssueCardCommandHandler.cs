@@ -6,24 +6,24 @@ using MediatR;
 
 namespace CrossLedgerWeb.Application.Cards;
 
-/// <summary>Issues a dev-simulated prepaid card - no real card network or issuing
-/// processor involved, same spirit as DevLogSmsSender simulating an SMS gateway. A fresh
-/// Card-kind wallet is created alongside it, starting at zero; TopUpCardCommand is the
-/// only way money ever enters it.</summary>
+/// <summary>Issues a card - no real card network sits behind this by default
+/// (SimulatedCardIssuer), or a real Stripe Issuing Cardholder/Card when
+/// CardIssuing:UseStripe is on (StripeCardIssuer) - same spirit as DevLogSmsSender
+/// simulating an SMS gateway until a real one is configured. A fresh Card-kind wallet is
+/// created alongside it, starting at zero; TopUpCardCommand is the only way money ever
+/// enters it.</summary>
 public sealed class IssueCardCommandHandler : IRequestHandler<IssueCardCommand, IssueCardResult>
 {
-    private const int ValidityYears = 3;
-
     private readonly IWalletRepository _wallets;
     private readonly ICardRepository _cards;
-    private readonly ICardNumberGenerator _numberGenerator;
+    private readonly ICardIssuer _cardIssuer;
     private readonly IClock _clock;
 
-    public IssueCardCommandHandler(IWalletRepository wallets, ICardRepository cards, ICardNumberGenerator numberGenerator, IClock clock)
+    public IssueCardCommandHandler(IWalletRepository wallets, ICardRepository cards, ICardIssuer cardIssuer, IClock clock)
     {
         _wallets = wallets;
         _cards = cards;
-        _numberGenerator = numberGenerator;
+        _cardIssuer = cardIssuer;
         _clock = clock;
     }
 
@@ -35,14 +35,17 @@ public sealed class IssueCardCommandHandler : IRequestHandler<IssueCardCommand, 
         var cardWallet = new Wallet(WalletId.New(), request.OwnerId, currency, WalletKind.Card);
         _wallets.Add(cardWallet);
 
-        var (pan, cvv) = _numberGenerator.Generate();
+        var issued = await _cardIssuer.IssueAsync(
+            new CardIssuanceRequest(request.OwnerId, request.CardholderName, request.CardType, currency, request.RegisteredAddress),
+            cancellationToken);
         var shippingAddress = request.ShippingAddress ?? request.RegisteredAddress;
 
         var card = new Card(
             CardId.New(), request.OwnerId, cardWallet.Id, currency, request.CardType, request.CardholderName,
-            pan, cvv, now.Month, now.Year + ValidityYears, now,
+            issued.Pan, issued.Cvv, issued.ExpiryMonth, issued.ExpiryYear, now,
             request.SourceOfFunds, request.EstimatedGrossAnnualIncome, request.EstimatedNetWorth, request.IsActivelyEmployed,
-            request.EmployerCompanyName, request.JobTitle, request.RegisteredAddress, shippingAddress);
+            request.EmployerCompanyName, request.JobTitle, request.RegisteredAddress, shippingAddress,
+            issued.StripeCardholderId, issued.StripeCardId);
         _cards.Add(card);
 
         return new IssueCardResult(
