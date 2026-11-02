@@ -1,5 +1,7 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
+using CrossLedgerWeb.Domain.Cards;
+using CrossLedgerWeb.Domain.Exceptions;
 using CrossLedgerWeb.Domain.Ledger;
 using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
@@ -29,6 +31,12 @@ public sealed class TopUpCardCommandHandler : IRequestHandler<TopUpCardCommand, 
         var card = await _cards.GetByIdAsync(request.CardId, cancellationToken);
         if (card is null || card.OwnerId != request.CallerId)
             throw new CardNotFoundException(request.CardId);
+
+        // Nothing to fund yet (PendingApproval) or ever (Rejected) - EnsureCanSpend
+        // already blocks purchases on these same two statuses; top-up needs its own
+        // check since it isn't a spend.
+        if (card.Status is CardStatus.PendingApproval or CardStatus.Rejected)
+            throw new InvalidCardStateException(card.Id, card.Status, "top up");
 
         var cardWallet = await _wallets.GetByIdAsync(card.CardWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(card.CardWalletId);

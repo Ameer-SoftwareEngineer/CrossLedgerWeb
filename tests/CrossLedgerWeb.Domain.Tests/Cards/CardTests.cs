@@ -12,18 +12,67 @@ public class CardTests
     private static readonly DateTimeOffset IssuedAt = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
 
-    private static Card NewCard(string cardholderName = "Test Customer", string pan = "4532750123456784", string cvv = "123") => new(
+    private static Card NewPendingCard(string cardholderName = "Test Customer", string pan = "4532750123456784", string cvv = "123") => new(
         CardId.New(), UserId.New(), WalletId.New(), Usd, CardType.Virtual, cardholderName, pan, cvv, 1, 2029, IssuedAt,
         SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", TestAddress, TestAddress);
 
+    // Most tests below exercise behaviour (freeze, spend, close...) that assumes an
+    // approved card - the approval gate itself is covered separately below.
+    private static Card NewCard(string cardholderName = "Test Customer", string pan = "4532750123456784", string cvv = "123")
+    {
+        var card = NewPendingCard(cardholderName, pan, cvv);
+        card.Approve();
+        return card;
+    }
+
     [Fact]
-    public void Constructor_starts_the_card_as_Active_with_no_spending_limit()
+    public void Constructor_starts_the_card_as_PendingApproval_with_no_spending_limit()
+    {
+        var card = NewPendingCard();
+
+        card.Status.Should().Be(CardStatus.PendingApproval);
+        card.SpendingLimit.Should().BeNull();
+        card.ClosedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Approve_transitions_PendingApproval_to_Active()
+    {
+        var card = NewPendingCard();
+
+        card.Approve();
+
+        card.Status.Should().Be(CardStatus.Active);
+    }
+
+    [Fact]
+    public void Approve_throws_when_the_card_is_not_PendingApproval()
     {
         var card = NewCard();
 
-        card.Status.Should().Be(CardStatus.Active);
-        card.SpendingLimit.Should().BeNull();
-        card.ClosedAt.Should().BeNull();
+        var act = () => card.Approve();
+
+        act.Should().Throw<InvalidCardStateException>();
+    }
+
+    [Fact]
+    public void Reject_transitions_PendingApproval_to_Rejected()
+    {
+        var card = NewPendingCard();
+
+        card.Reject();
+
+        card.Status.Should().Be(CardStatus.Rejected);
+    }
+
+    [Fact]
+    public void Reject_throws_when_the_card_is_not_PendingApproval()
+    {
+        var card = NewCard();
+
+        var act = () => card.Reject();
+
+        act.Should().Throw<InvalidCardStateException>();
     }
 
     [Fact]

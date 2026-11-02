@@ -60,7 +60,7 @@ public sealed class CardPersistenceTests : IDisposable
         reloaded!.Pan.Should().Be("4532750123456784");
         reloaded.Cvv.Should().Be("123");
         reloaded.Last4.Should().Be("6784");
-        reloaded.Status.Should().Be(CardStatus.Active);
+        reloaded.Status.Should().Be(CardStatus.PendingApproval);
         reloaded.RegisteredAddress.Should().Be(RegisteredAddress);
         reloaded.ShippingAddress.Should().Be(ShippingAddress);
     }
@@ -89,6 +89,7 @@ public sealed class CardPersistenceTests : IDisposable
     public async Task A_frozen_cards_status_round_trips()
     {
         var card = NewCard();
+        card.Approve();
         card.Freeze();
         card.SetSpendingLimit(250m);
 

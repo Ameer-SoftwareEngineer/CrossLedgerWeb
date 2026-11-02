@@ -1,7 +1,9 @@
 using CrossLedgerWeb.Application.Admin;
 using CrossLedgerWeb.Application.Auth;
+using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.ValueObjects;
 using CrossLedgerWeb.Shared.Admin;
+using CrossLedgerWeb.Shared.Cards;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -82,6 +84,39 @@ public sealed class AdminController : ControllerBase
         await _mediator.Send(new RejectRegistrationCommand(new UserId(userId)), cancellationToken);
         return NoContent();
     }
+
+    [HttpGet("card-requests/pending")]
+    [ProducesResponseType<IReadOnlyList<PendingCardRequestResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PendingCardRequestResponse>>> ListPendingCardRequests(CancellationToken cancellationToken)
+    {
+        var pending = await _mediator.Send(new ListPendingCardRequestsQuery(), cancellationToken);
+
+        var response = pending
+            .Select(c => new PendingCardRequestResponse(
+                c.Id.Value, c.OwnerId.Value, c.OwnerEmail, c.Currency, c.CardType.ToString(), c.CardholderName, c.SourceOfFunds.ToString(),
+                c.EstimatedGrossAnnualIncome, c.EstimatedNetWorth, c.IsActivelyEmployed, c.EmployerCompanyName, c.JobTitle,
+                ToAddressDto(c.RegisteredAddress), ToAddressDto(c.ShippingAddress), c.RequestedAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
+    [HttpPost("card-requests/{cardId:guid}/approve")]
+    public async Task<IActionResult> ApproveCardRequest(Guid cardId, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new ApproveCardRequestCommand(new CardId(cardId)), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("card-requests/{cardId:guid}/reject")]
+    public async Task<IActionResult> RejectCardRequest(Guid cardId, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RejectCardRequestCommand(new CardId(cardId)), cancellationToken);
+        return NoContent();
+    }
+
+    private static CardAddressDto ToAddressDto(CardAddress address) =>
+        new(address.Street, address.Number, address.State, address.Postcode, address.City, address.Country);
 
     [HttpGet("provider-health")]
     [ProducesResponseType<IReadOnlyList<ProviderHealthResponse>>(StatusCodes.Status200OK)]

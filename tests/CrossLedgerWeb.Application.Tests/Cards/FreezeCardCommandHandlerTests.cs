@@ -25,6 +25,7 @@ public class FreezeCardCommandHandlerTests
         _card = new Card(
             CardId.New(), Owner, WalletId.New(), Usd, CardType.Virtual, "Test Customer", "4532750123456784", "123", 1, 2029, Now,
             SourceOfFunds.Salary, 5000m, 100000m, true, "Acme Inc", "Developer", TestAddress, TestAddress);
+        _card.Approve();
         _cards.Setup(x => x.GetByIdAsync(_card.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_card);
     }
 

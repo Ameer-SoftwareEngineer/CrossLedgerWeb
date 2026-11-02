@@ -21,5 +21,11 @@ public sealed class CardRepository : ICardRepository
     public async Task<IReadOnlyList<Card>> ListByOwnerAsync(UserId ownerId, CancellationToken cancellationToken) =>
         await _db.Cards.Where(c => c.OwnerId == ownerId).ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Card>> ListPendingApprovalAsync(CancellationToken cancellationToken) =>
+        await _db.Cards
+            .Where(c => c.Status == CardStatus.PendingApproval)
+            .OrderBy(c => c.IssuedAt)
+            .ToListAsync(cancellationToken);
+
     public void Add(Card card) => _db.Cards.Add(card);
 }

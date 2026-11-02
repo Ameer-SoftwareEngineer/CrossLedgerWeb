@@ -42,7 +42,7 @@ public class IssueCardCommandHandlerTests
         result.Currency.Should().Be(Currency.From("USD"));
         result.CardType.Should().Be(CardType.Virtual);
         result.Last4.Should().Be("6784");
-        result.Status.Should().Be(CardStatus.Active);
+        result.Status.Should().Be(CardStatus.PendingApproval);
         result.Balance.Should().Be(0m);
         result.ExpiryYear.Should().Be(Now.Year + 3);
     }

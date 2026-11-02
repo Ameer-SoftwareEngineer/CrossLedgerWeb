@@ -13,7 +13,9 @@ namespace CrossLedgerWeb.Domain.Cards;
 /// this object; they are encrypted at rest by CardConfiguration's EF conversion, the same
 /// way TwoFactorCredential.Secret is - reading them back out through the domain object is
 /// exactly how "reveal" is supposed to work, which is why the API layer gates the reveal
-/// endpoint with step-up rather than the entity hiding its own fields.
+/// endpoint with step-up rather than the entity hiding its own fields. Starts
+/// PendingApproval, not Active - an admin review gate on issuance, same shape as
+/// ApplicationUser.RegistrationStatus gating login.
 /// </summary>
 public sealed class Card
 {
@@ -100,7 +102,7 @@ public sealed class Card
         JobTitle = jobTitle;
         RegisteredAddress = registeredAddress;
         ShippingAddress = shippingAddress;
-        Status = CardStatus.Active;
+        Status = CardStatus.PendingApproval;
     }
 
     /// <summary>Rehydrates a card exactly as it was persisted, bypassing the public
@@ -154,6 +156,28 @@ public sealed class Card
         JobTitle = jobTitle;
         RegisteredAddress = default!;
         ShippingAddress = default!;
+    }
+
+    /// <summary>An admin cleared the issuance request (specification 9's Admin Console) -
+    /// the card can now be used. Mirrors ApplicationUser's own RegistrationStatus gate on
+    /// login: credentials/intake alone were never enough.</summary>
+    public void Approve()
+    {
+        if (Status != CardStatus.PendingApproval)
+            throw new InvalidCardStateException(Id, Status, "approve");
+
+        Status = CardStatus.Active;
+    }
+
+    /// <summary>An admin declined the request - terminal, same as Close, but reachable
+    /// only from PendingApproval so an already-Active card can't be retroactively
+    /// rejected.</summary>
+    public void Reject()
+    {
+        if (Status != CardStatus.PendingApproval)
+            throw new InvalidCardStateException(Id, Status, "reject");
+
+        Status = CardStatus.Rejected;
     }
 
     public void Freeze()
