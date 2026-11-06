@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IOtcRequestRepository, OtcRequestRepository>();
         services.AddScoped<ICardRepository, CardRepository>();
         services.AddScoped<ICardPurchaseRepository, CardPurchaseRepository>();
+        services.AddScoped<ICardAuthorizationRepository, CardAuthorizationRepository>();
         services.AddScoped<IMerchantSettlementWalletResolver, MerchantSettlementWalletResolver>();
         services.AddScoped<ICardNumberGenerator, CardNumberGenerator>();
         services.Configure<CardIssuingOptions>(configuration.GetSection(CardIssuingOptions.SectionName));

@@ -360,6 +360,60 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.ToTable("Cards", (string)null);
                 });
 
+            modelBuilder.Entity("CrossLedgerWeb.Domain.Cards.CardAuthorization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Approved")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("CardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeclineReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("MerchantName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("StripeAuthorizationId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.ComplexProperty<Dictionary<string, object>>("Amount", "CrossLedgerWeb.Domain.Cards.CardAuthorization.Amount#Money", b1 =>
+                        {
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("decimal(19,4)")
+                                .HasColumnName("Amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("nvarchar(3)")
+                                .HasColumnName("CurrencyCode");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId");
+
+                    b.HasIndex("StripeAuthorizationId")
+                        .IsUnique();
+
+                    b.ToTable("CardAuthorizations", (string)null);
+                });
+
             modelBuilder.Entity("CrossLedgerWeb.Domain.Cards.CardPurchase", b =>
                 {
                     b.Property<Guid>("Id")

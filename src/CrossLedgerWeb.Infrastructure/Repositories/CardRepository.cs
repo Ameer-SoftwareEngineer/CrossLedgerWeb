@@ -18,6 +18,9 @@ public sealed class CardRepository : ICardRepository
     public Task<Card?> GetByIdAsync(CardId id, CancellationToken cancellationToken) =>
         _db.Cards.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
+    public Task<Card?> GetByStripeCardIdAsync(string stripeCardId, CancellationToken cancellationToken) =>
+        _db.Cards.FirstOrDefaultAsync(c => c.StripeCardId == stripeCardId, cancellationToken);
+
     public async Task<IReadOnlyList<Card>> ListByOwnerAsync(UserId ownerId, CancellationToken cancellationToken) =>
         await _db.Cards.Where(c => c.OwnerId == ownerId).ToListAsync(cancellationToken);
 

@@ -7,6 +7,12 @@ public interface ICardRepository
 {
     Task<Card?> GetByIdAsync(CardId id, CancellationToken cancellationToken);
 
+    /// <summary>Backs the real-time authorization webhook (specification 12.3) - Stripe
+    /// identifies the card by its own id, never ours, so this is the only lookup path that
+    /// webhook has. Returns null for any card issued via SimulatedCardIssuer, which never
+    /// sets StripeCardId - the caller treats that the same as "unknown card".</summary>
+    Task<Card?> GetByStripeCardIdAsync(string stripeCardId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Card>> ListByOwnerAsync(UserId ownerId, CancellationToken cancellationToken);
 
     /// <summary>Backs the Admin Console's card issuance review (specification 9) - every

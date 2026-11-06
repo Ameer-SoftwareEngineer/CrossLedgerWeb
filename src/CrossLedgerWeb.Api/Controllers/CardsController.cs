@@ -196,6 +196,27 @@ public sealed class CardsController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>Every real-time authorization decision for this card (specification
+    /// 12.3), approved or declined - declines never post a LedgerEntry, so this is the
+    /// only place a decline (and why) is visible; approvals also show up as a regular
+    /// debit in the card's own Transaction History.</summary>
+    [HttpGet("{cardId:guid}/authorizations")]
+    [ProducesResponseType<IReadOnlyList<CardAuthorizationResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CardAuthorizationResponse>>> ListAuthorizations(Guid cardId, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var authorizations = await _mediator.Send(new ListCardAuthorizationsQuery(new CardId(cardId), userId), cancellationToken);
+
+        var response = authorizations
+            .Select(a => new CardAuthorizationResponse(
+                a.AuthorizationId.Value, a.MerchantName, a.Amount.Amount, a.Amount.Currency.Code, a.Approved, a.DeclineReason, a.DecidedAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
     private static CardResponse ToResponse(
         CardId cardId, WalletId cardWalletId, Currency currency, CardType cardType, string cardholderName,
         string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, decimal balance, DateTimeOffset issuedAt) =>

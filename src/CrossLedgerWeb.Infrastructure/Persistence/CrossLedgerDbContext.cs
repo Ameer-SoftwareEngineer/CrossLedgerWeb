@@ -46,6 +46,7 @@ public sealed class CrossLedgerWebDbContext : IdentityDbContext<ApplicationUser,
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<Card> Cards => Set<Card>();
     public DbSet<CardPurchase> CardPurchases => Set<CardPurchase>();
+    public DbSet<CardAuthorization> CardAuthorizations => Set<CardAuthorization>();
     public DbSet<SecurityAuditEvent> SecurityAuditEvents => Set<SecurityAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

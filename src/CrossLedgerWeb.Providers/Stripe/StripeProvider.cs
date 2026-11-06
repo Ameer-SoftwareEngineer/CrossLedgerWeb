@@ -36,25 +36,11 @@ public sealed class StripeProvider : IPaymentProvider
     public Task<PayoutResult> ExecuteAsync(PayoutRequest request, CancellationToken cancellationToken) =>
         throw new NotSupportedException("Stripe is the funding rail, not a payout route - Supports() always returns false, so the routing engine never calls this.");
 
-    /// <summary>Stripe's real webhook scheme - a Stripe-Signature header shaped
-    /// "t=&lt;unix timestamp&gt;,v1=&lt;hex hmac&gt;" over "{timestamp}.{payload}", not
-    /// a bare signature over the raw payload like the other providers. This part is
-    /// implemented against Stripe's actual, stable, publicly documented algorithm -
-    /// unlike Quote/Execute above, it doesn't need a live sandbox to get right.</summary>
-    public bool VerifySignature(string payload, string signature, string secret)
-    {
-        var parts = signature
-            .Split(',')
-            .Select(part => part.Split('=', 2))
-            .Where(part => part.Length == 2)
-            .ToDictionary(part => part[0], part => part[1]);
-
-        if (!parts.TryGetValue("t", out var timestamp) || !parts.TryGetValue("v1", out var providedSignature))
-            return false;
-
-        var signedPayload = $"{timestamp}.{payload}";
-        return HmacSignatureVerifier.Verify(signedPayload, providedSignature, secret);
-    }
+    /// <summary>Stripe's real webhook scheme - see StripeSignatureVerifier's own doc
+    /// comment for the algorithm itself; this just delegates to it so the Issuing
+    /// real-time authorization webhook can reuse the identical logic.</summary>
+    public bool VerifySignature(string payload, string signature, string secret) =>
+        StripeSignatureVerifier.Verify(payload, signature, secret);
 
     public async Task<ProviderHealth> CheckHealthAsync(CancellationToken cancellationToken)
     {
