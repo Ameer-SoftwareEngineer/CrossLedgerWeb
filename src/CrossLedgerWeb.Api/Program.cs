@@ -52,6 +52,7 @@ builder.Services.AddScoped<IRequestContextAccessor, HttpRequestContextAccessor>(
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<FxRateBroadcastService>();
 builder.Services.AddHostedService<LedgerReconciliationBackgroundService>();
+builder.Services.AddHostedService<ExpireCardAuthorizationHoldsBackgroundService>();
 
 // CrossLedgerFrontend runs on its own origin (a separate repo, a separate dev server
 // port) - without this, the browser blocks every call the Blazor WASM app makes here.

@@ -2,48 +2,53 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Exceptions;
-using CrossLedgerWeb.Domain.Ledger;
 using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CrossLedgerWeb.Application.Cards;
 
 /// <summary>
-/// Decides one Stripe Issuing real-time authorization request (specification 12.3) -
-/// called from the issuing_authorization.request webhook, inside its 2-second budget. An
-/// approval is posted as an immediate, full-amount purchase via the exact same
-/// CardPurchasePoster/CardPurchase pair SimulateCardPurchaseCommandHandler already uses -
-/// true hold-then-separately-capture (partial captures, an expiry sweeper for an
-/// uncaptured hold) needs a pending-vs-settled ledger-entry state nothing else in this
-/// codebase has yet, and is spec'd as its own later "Settlement" slice (week 18); this
-/// slice's "reserve funds" is the synchronous webhook-to-ledger decision itself.
+/// Decides one Stripe Issuing real-time authorization request (specification 12.3) - called
+/// from the issuing_authorization.request webhook, inside its 2-second budget. An approval
+/// only opens a hold (CardAuthorization's own HoldStatus.Open, see its doc comment) - no
+/// LedgerEntry is posted here. The actual purchase is posted later, by
+/// CaptureCardAuthorizationCommandHandler, when Stripe's separate capture webhook arrives
+/// (possibly for less than the held amount - a partial capture) - or never, if the expiry
+/// sweeper releases an uncaptured hold first.
+///
+/// Known, unaddressed race: "available balance" below is an ordinary read (wallet balance
+/// minus the sum of this card's other Open holds), not locked the way usp_PostTransfer locks
+/// a wallet row under UPDLOCK/ROWLOCK for a transfer. Two authorization requests against the
+/// same card arriving close enough together can both read the same available balance before
+/// either's hold is inserted, and both approve - a genuine TOCTOU double-hold. Closing this
+/// needs either a serializable transaction around "sum Open holds + insert" or a dedicated
+/// stored procedure with the same locking usp_PostTransfer already uses; this slice documents
+/// the gap rather than closing it.
 /// </summary>
 public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<DecideCardAuthorizationCommand, DecideCardAuthorizationResult>
 {
     private readonly ICardRepository _cards;
     private readonly ICardAuthorizationRepository _authorizations;
-    private readonly ICardPurchaseRepository _purchases;
     private readonly IWalletRepository _wallets;
-    private readonly IMerchantSettlementWalletResolver _merchantSettlementWallets;
     private readonly IClock _clock;
+    private readonly IOptions<CardIssuingOptions> _options;
     private readonly ILogger<DecideCardAuthorizationCommandHandler> _logger;
 
     public DecideCardAuthorizationCommandHandler(
         ICardRepository cards,
         ICardAuthorizationRepository authorizations,
-        ICardPurchaseRepository purchases,
         IWalletRepository wallets,
-        IMerchantSettlementWalletResolver merchantSettlementWallets,
         IClock clock,
+        IOptions<CardIssuingOptions> options,
         ILogger<DecideCardAuthorizationCommandHandler> logger)
     {
         _cards = cards;
         _authorizations = authorizations;
-        _purchases = purchases;
         _wallets = wallets;
-        _merchantSettlementWallets = merchantSettlementWallets;
         _clock = clock;
+        _options = options;
         _logger = logger;
     }
 
@@ -86,7 +91,6 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         var amount = new Money(ToDecimalAmount(request.AmountMinorUnits, currency.DecimalPlaces), currency);
 
         string? declineReason = null;
-        TransferId? transferId = null;
 
         try
         {
@@ -94,15 +98,11 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
 
             var wallet = await _wallets.GetByIdAsync(card.CardWalletId, cancellationToken)
                 ?? throw new WalletNotFoundException(card.CardWalletId);
-            var merchantSettlementWallet = await _merchantSettlementWallets.GetMerchantSettlementWalletAsync(card.Currency, cancellationToken);
+            var openHoldTotal = await _authorizations.GetOpenHoldTotalAsync(card.Id, card.Currency, cancellationToken);
+            var available = wallet.Balance - openHoldTotal;
 
-            var now = _clock.UtcNow;
-            var newTransferId = TransferId.New();
-            CardPurchasePoster.Post(newTransferId, wallet, merchantSettlementWallet, amount, now);
-
-            var purchase = new CardPurchase(CardPurchaseId.New(), card.Id, newTransferId, request.MerchantName, amount, now);
-            _purchases.Add(purchase);
-            transferId = newTransferId;
+            if (available.Amount < amount.Amount)
+                throw new InsufficientFundsException(wallet.Id, available, amount);
         }
         catch (InvalidCardStateException)
         {
@@ -118,9 +118,10 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         }
 
         var approved = declineReason is null;
+        var holdDuration = approved ? TimeSpan.FromDays(_options.Value.AuthorizationHoldDays) : (TimeSpan?)null;
         var authorization = new CardAuthorization(
             CardAuthorizationId.New(), card.Id, request.StripeAuthorizationId, amount,
-            request.MerchantName, approved, declineReason, transferId, _clock.UtcNow);
+            request.MerchantName, approved, declineReason, holdDuration, _clock.UtcNow);
         _authorizations.Add(authorization);
 
         return new DecideCardAuthorizationResult(approved, declineReason);

@@ -368,6 +368,9 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Approved")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("CapturedAmount")
+                        .HasColumnType("decimal(19,4)");
+
                     b.Property<Guid>("CardId")
                         .HasColumnType("uniqueidentifier");
 
@@ -378,13 +381,28 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("HoldStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("MerchantName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("StripeAuthorizationId")
                         .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("StripeTransactionId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -410,6 +428,12 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("StripeAuthorizationId")
                         .IsUnique();
+
+                    b.HasIndex("StripeTransactionId")
+                        .IsUnique()
+                        .HasFilter("[StripeTransactionId] IS NOT NULL");
+
+                    b.HasIndex("HoldStatus", "ExpiresAt");
 
                     b.ToTable("CardAuthorizations", (string)null);
                 });

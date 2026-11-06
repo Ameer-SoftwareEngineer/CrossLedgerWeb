@@ -18,8 +18,13 @@ public sealed class CardAuthorizationConfiguration : IEntityTypeConfiguration<Ca
         builder.Property(a => a.MerchantName).HasMaxLength(100);
         builder.Property(a => a.Approved);
         builder.Property(a => a.DeclineReason).HasMaxLength(50);
+        builder.Property(a => a.HoldStatus).HasConversion<string>().HasMaxLength(20);
+        builder.Property(a => a.ExpiresAt);
+        builder.Property(a => a.CapturedAmount).HasColumnType("decimal(19,4)");
+        builder.Property(a => a.StripeTransactionId).HasMaxLength(255);
         builder.Property(a => a.TransferId).HasConversion(new TransferIdConverter());
         builder.Property(a => a.DecidedAt);
+        builder.Property(a => a.ResolvedAt);
 
         builder.ComplexProperty(a => a.Amount, money =>
         {
@@ -29,5 +34,7 @@ public sealed class CardAuthorizationConfiguration : IEntityTypeConfiguration<Ca
 
         builder.HasIndex(a => a.CardId);
         builder.HasIndex(a => a.StripeAuthorizationId).IsUnique();
+        builder.HasIndex(a => a.StripeTransactionId).IsUnique().HasFilter("[StripeTransactionId] IS NOT NULL");
+        builder.HasIndex(a => new { a.HoldStatus, a.ExpiresAt });
     }
 }

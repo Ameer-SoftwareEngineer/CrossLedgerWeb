@@ -31,3 +31,25 @@ public sealed record StripeIssuingPendingRequest(
     [property: JsonPropertyName("currency")] string Currency);
 
 public sealed record StripeIssuingMerchantData([property: JsonPropertyName("name")] string? Name);
+
+/// <summary>The Transaction object a issuing_transaction.created event carries (specification
+/// 12.3/12.4's "Settlement" week), fetched directly from Stripe's own, current, publicly
+/// documented docs.stripe.com/issuing/purchases/transactions - a capture, not an
+/// authorization, delivered to Stripe's ordinary webhook endpoint (never the synchronous
+/// authorization one - see IssuingWebhooksController's own doc comment). Only the fields
+/// CaptureCardAuthorizationCommand needs; Amount's sign reflects Stripe's own Issuing-balance
+/// accounting convention (negative for a capture) and is not meaningful to this codebase -
+/// only its magnitude is used.</summary>
+public sealed record StripeIssuingTransaction(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("amount")] long Amount,
+    [property: JsonPropertyName("currency")] string Currency,
+    [property: JsonPropertyName("authorization")] string? Authorization);
+
+public sealed record StripeIssuingTransactionWebhookData(
+    [property: JsonPropertyName("object")] StripeIssuingTransaction? Object);
+
+public sealed record StripeIssuingTransactionWebhookEnvelope(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("data")] StripeIssuingTransactionWebhookData? Data);
