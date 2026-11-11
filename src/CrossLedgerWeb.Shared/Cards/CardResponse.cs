@@ -17,4 +17,9 @@ public sealed record CardResponse(
     IReadOnlyList<string> AllowedCountries,
     decimal? DailySpendingLimit,
     decimal? MonthlySpendingLimit,
-    bool HasPin);
+    bool HasPin,
+    string FulfillmentStatus,
+    string? ShippingCarrier,
+    string? TrackingNumber,
+    bool IsActivated,
+    Guid? ReplacesCardId);

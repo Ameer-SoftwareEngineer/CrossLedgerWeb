@@ -54,7 +54,8 @@ public sealed class CardsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, ToResponse(
             result.CardId, result.CardWalletId, result.Currency, result.CardType, result.CardholderName,
             result.Last4, result.ExpiryMonth, result.ExpiryYear, result.Status, null, result.Balance, result.IssuedAt,
-            Array.Empty<string>(), Array.Empty<string>(), null, null, false));
+            Array.Empty<string>(), Array.Empty<string>(), null, null, false,
+            result.FulfillmentStatus, null, null, result.IsActivated, null));
     }
 
     [HttpGet]
@@ -69,7 +70,8 @@ public sealed class CardsController : ControllerBase
         var response = cards.Select(c => ToResponse(
             c.CardId, c.CardWalletId, c.Currency, c.CardType, c.CardholderName, c.Last4,
             c.ExpiryMonth, c.ExpiryYear, c.Status, c.SpendingLimit, c.Balance, c.IssuedAt,
-            c.BlockedMerchantCategoryCodes.ToList(), c.AllowedCountries.ToList(), c.DailySpendingLimit, c.MonthlySpendingLimit, c.HasPin)).ToList();
+            c.BlockedMerchantCategoryCodes.ToList(), c.AllowedCountries.ToList(), c.DailySpendingLimit, c.MonthlySpendingLimit, c.HasPin,
+            c.FulfillmentStatus, c.ShippingCarrier, c.TrackingNumber, c.IsActivated, c.ReplacesCardId?.Value)).ToList();
 
         return Ok(response);
     }
@@ -234,6 +236,38 @@ public sealed class CardsController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>The customer confirming receipt of a physical card - the one action that
+    /// unlocks spending on it (Card.EnsureCanSpend). No step-up - confirming receipt of
+    /// your own card isn't sensitive the way changing a PIN or spending limit is.</summary>
+    [HttpPost("{cardId:guid}/activate")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Activate(Guid cardId, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        await _mediator.Send(new ActivateCardCommand(new CardId(cardId), userId), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Reports a card lost/stolen/damaged - closes it and issues a replacement
+    /// on the same wallet (specification 12.4/19). Step-up gated - at least as sensitive
+    /// as changing spending limits.</summary>
+    [HttpPost("{cardId:guid}/reissue")]
+    [RequireStepUp(Operation = StepUpOperation.ReissueCard)]
+    [ProducesResponseType<ReissueCardResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReissueCardResponse>> Reissue(Guid cardId, ReissueCardRequest request, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var result = await _mediator.Send(
+            new ReissueCardCommand(new CardId(cardId), userId, request.NewShippingAddress is null ? null : ToDomainAddress(request.NewShippingAddress)),
+            cancellationToken);
+
+        return Ok(new ReissueCardResponse(result.CardId.Value));
+    }
+
     /// <summary>Every real-time authorization decision for this card (specification
     /// 12.3), approved or declined - declines never post a LedgerEntry, so this is the
     /// only place a decline (and why) is visible; approvals also show up as a regular
@@ -258,9 +292,11 @@ public sealed class CardsController : ControllerBase
     private static CardResponse ToResponse(
         CardId cardId, WalletId cardWalletId, Currency currency, CardType cardType, string cardholderName,
         string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, decimal balance, DateTimeOffset issuedAt,
-        IReadOnlyList<string> blockedMerchantCategoryCodes, IReadOnlyList<string> allowedCountries, decimal? dailySpendingLimit, decimal? monthlySpendingLimit, bool hasPin) =>
+        IReadOnlyList<string> blockedMerchantCategoryCodes, IReadOnlyList<string> allowedCountries, decimal? dailySpendingLimit, decimal? monthlySpendingLimit, bool hasPin,
+        CardFulfillmentStatus fulfillmentStatus, string? shippingCarrier, string? trackingNumber, bool isActivated, Guid? replacesCardId) =>
         new(cardId.Value, cardWalletId.Value, currency.Code, cardType.ToString(), cardholderName, last4, expiryMonth, expiryYear, status.ToString(), spendingLimit, balance, issuedAt,
-            blockedMerchantCategoryCodes, allowedCountries, dailySpendingLimit, monthlySpendingLimit, hasPin);
+            blockedMerchantCategoryCodes, allowedCountries, dailySpendingLimit, monthlySpendingLimit, hasPin,
+            fulfillmentStatus.ToString(), shippingCarrier, trackingNumber, isActivated, replacesCardId);
 
     private static Domain.Cards.CardAddress ToDomainAddress(CardAddressDto dto) =>
         new(dto.Street, dto.Number, dto.State, dto.Postcode, dto.City, dto.Country);

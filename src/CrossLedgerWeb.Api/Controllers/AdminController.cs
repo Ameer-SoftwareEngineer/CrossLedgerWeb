@@ -118,6 +118,37 @@ public sealed class AdminController : ControllerBase
     private static CardAddressDto ToAddressDto(CardAddress address) =>
         new(address.Street, address.Number, address.State, address.Postcode, address.City, address.Country);
 
+    /// <summary>Physical cards still awaiting a shipping action, or delivered but not yet
+    /// activated (specification 12.4/19's "Card Fulfillment" tab).</summary>
+    [HttpGet("cards/awaiting-fulfillment")]
+    [ProducesResponseType<IReadOnlyList<CardFulfillmentSummaryResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CardFulfillmentSummaryResponse>>> ListCardsAwaitingFulfillment(CancellationToken cancellationToken)
+    {
+        var cards = await _mediator.Send(new ListCardsAwaitingFulfillmentQuery(), cancellationToken);
+
+        var response = cards
+            .Select(c => new CardFulfillmentSummaryResponse(
+                c.CardId.Value, c.OwnerId.Value, c.OwnerEmail, c.CardholderName, c.FulfillmentStatus.ToString(),
+                c.ShippingCarrier, c.TrackingNumber, ToAddressDto(c.ShippingAddress), c.IssuedAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
+    [HttpPost("cards/{cardId:guid}/ship")]
+    public async Task<IActionResult> MarkCardShipped(Guid cardId, MarkCardShippedRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new MarkCardShippedCommand(new CardId(cardId), request.Carrier, request.TrackingNumber), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("cards/{cardId:guid}/deliver")]
+    public async Task<IActionResult> MarkCardDelivered(Guid cardId, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new MarkCardDeliveredCommand(new CardId(cardId)), cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("provider-health")]
     [ProducesResponseType<IReadOnlyList<ProviderHealthResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ProviderHealthResponse>>> GetProviderHealth(CancellationToken cancellationToken)

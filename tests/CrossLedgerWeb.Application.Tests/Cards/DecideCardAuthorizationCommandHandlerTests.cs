@@ -91,6 +91,25 @@ public class DecideCardAuthorizationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_declines_as_card_not_activated_for_an_unactivated_physical_card()
+    {
+        var card = new Card(
+            CardId.New(), Owner, WalletId.New(), Currency.From("USD"), CardType.Physical, "Test Customer",
+            "4532750123456784", "123", 1, Now.Year + 3, Now,
+            SourceOfFunds.Salary, 50000m, 100000m, true, "Acme Inc", "Developer",
+            TestAddress, TestAddress, stripeCardholderId: "ich_test", stripeCardId: StripeCardId);
+        card.Approve();
+        card.MarkShipped("UPS", "1Z999", Now);
+        SetUpFundedCard(card, balance: 100m);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(Command(), CancellationToken.None);
+
+        result.Approved.Should().BeFalse();
+        result.DeclineReason.Should().Be("card_not_activated");
+    }
+
+    [Fact]
     public async Task Handle_declines_as_card_not_active_when_the_card_is_still_pending_approval()
     {
         var card = NewCard(); // never Approved - starts PendingApproval

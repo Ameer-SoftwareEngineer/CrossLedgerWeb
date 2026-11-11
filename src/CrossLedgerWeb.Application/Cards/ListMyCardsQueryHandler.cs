@@ -27,7 +27,8 @@ public sealed class ListMyCardsQueryHandler : IRequestHandler<ListMyCardsQuery, 
             summaries.Add(new CardSummary(
                 card.Id, card.CardWalletId, card.Currency, card.CardType, card.CardholderName, card.Last4,
                 card.ExpiryMonth, card.ExpiryYear, card.Status, card.SpendingLimit, balance, card.IssuedAt,
-                card.BlockedMerchantCategoryCodes, card.AllowedCountries, card.DailySpendingLimit, card.MonthlySpendingLimit, card.HasPin));
+                card.BlockedMerchantCategoryCodes, card.AllowedCountries, card.DailySpendingLimit, card.MonthlySpendingLimit, card.HasPin,
+                card.FulfillmentStatus, card.ShippingCarrier, card.TrackingNumber, card.IsActivated, card.ReplacesCardId));
         }
 
         return summaries;

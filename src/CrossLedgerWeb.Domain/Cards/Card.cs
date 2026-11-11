@@ -61,6 +61,25 @@ public sealed class Card
     /// PIN" without ever exposing the PIN itself.</summary>
     public bool HasPin => Pin is not null;
 
+    /// <summary>NotApplicable for Virtual (nothing to ship, ever); Pending for Physical
+    /// until shipped. See CardFulfillmentStatus's own doc comment for the full
+    /// progression.</summary>
+    public CardFulfillmentStatus FulfillmentStatus { get; private set; }
+    public string? ShippingCarrier { get; private set; }
+    public string? TrackingNumber { get; private set; }
+    public DateTimeOffset? ShippedAt { get; private set; }
+    public DateTimeOffset? DeliveredAt { get; private set; }
+
+    /// <summary>True at issuance for Virtual (nothing to activate); false for Physical
+    /// until the customer activates it (see Activate). EnsureCanSpend refuses to let an
+    /// un-activated physical card spend.</summary>
+    public bool IsActivated { get; private set; }
+
+    /// <summary>Set only when this card was created by the reissue flow
+    /// (ReissueCardCommandHandler) to replace a lost/stolen/damaged card - null for a
+    /// normal issuance.</summary>
+    public CardId? ReplacesCardId { get; }
+
     // Captured once at issuance, same spirit as a real card issuer's KYC intake -
     // display/record-keeping only, nothing else on this entity reads these.
     public SourceOfFunds SourceOfFunds { get; }
@@ -105,7 +124,8 @@ public sealed class Card
         CardAddress registeredAddress,
         CardAddress shippingAddress,
         string? stripeCardholderId = null,
-        string? stripeCardId = null)
+        string? stripeCardId = null,
+        CardId? replacesCardId = null)
     {
         if (string.IsNullOrWhiteSpace(cardholderName))
             throw new ArgumentException("A card requires a cardholder name.", nameof(cardholderName));
@@ -140,7 +160,10 @@ public sealed class Card
         ShippingAddress = shippingAddress;
         StripeCardholderId = stripeCardholderId;
         StripeCardId = stripeCardId;
+        ReplacesCardId = replacesCardId;
         Status = CardStatus.PendingApproval;
+        FulfillmentStatus = cardType == CardType.Physical ? CardFulfillmentStatus.Pending : CardFulfillmentStatus.NotApplicable;
+        IsActivated = cardType != CardType.Physical;
     }
 
     /// <summary>Rehydrates a card exactly as it was persisted, bypassing the public
@@ -170,6 +193,13 @@ public sealed class Card
         decimal? dailySpendingLimit,
         decimal? monthlySpendingLimit,
         string? pin,
+        CardFulfillmentStatus fulfillmentStatus,
+        string? shippingCarrier,
+        string? trackingNumber,
+        DateTimeOffset? shippedAt,
+        DateTimeOffset? deliveredAt,
+        bool isActivated,
+        CardId? replacesCardId,
         SourceOfFunds sourceOfFunds,
         decimal estimatedGrossAnnualIncome,
         decimal estimatedNetWorth,
@@ -198,6 +228,13 @@ public sealed class Card
         DailySpendingLimit = dailySpendingLimit;
         MonthlySpendingLimit = monthlySpendingLimit;
         Pin = pin;
+        FulfillmentStatus = fulfillmentStatus;
+        ShippingCarrier = shippingCarrier;
+        TrackingNumber = trackingNumber;
+        ShippedAt = shippedAt;
+        DeliveredAt = deliveredAt;
+        IsActivated = isActivated;
+        ReplacesCardId = replacesCardId;
         SourceOfFunds = sourceOfFunds;
         EstimatedGrossAnnualIncome = estimatedGrossAnnualIncome;
         EstimatedNetWorth = estimatedNetWorth;
@@ -299,15 +336,73 @@ public sealed class Card
     }
 
     /// <summary>Throws if this card cannot be used for a purchase of this amount right
-    /// now - not Active, or over the per-purchase spending limit. Whether the card's own
-    /// wallet actually holds enough funds is Wallet.Debit's concern, checked when the
-    /// purchase is posted, not this entity's.</summary>
+    /// now - not Active, over the per-purchase spending limit, or (for a physical card)
+    /// not yet activated. Whether the card's own wallet actually holds enough funds is
+    /// Wallet.Debit's concern, checked when the purchase is posted, not this entity's.</summary>
     public void EnsureCanSpend(Money amount)
     {
         if (Status != CardStatus.Active)
             throw new InvalidCardStateException(Id, Status, "spend on");
 
+        if (!IsActivated)
+            throw new CardNotActivatedException(Id);
+
         if (SpendingLimit is { } limit && amount.Amount > limit)
             throw new CardSpendingLimitExceededException(Id, amount.Amount, limit);
+    }
+
+    public void MarkShipped(string carrier, string trackingNumber, DateTimeOffset shippedAt)
+    {
+        if (FulfillmentStatus != CardFulfillmentStatus.Pending)
+            throw new InvalidCardFulfillmentStateException(Id, FulfillmentStatus, "mark as shipped");
+
+        FulfillmentStatus = CardFulfillmentStatus.Shipped;
+        ShippingCarrier = carrier;
+        TrackingNumber = trackingNumber;
+        ShippedAt = shippedAt;
+    }
+
+    public void MarkDelivered(DateTimeOffset deliveredAt)
+    {
+        if (FulfillmentStatus != CardFulfillmentStatus.Shipped)
+            throw new InvalidCardFulfillmentStateException(Id, FulfillmentStatus, "mark as delivered");
+
+        FulfillmentStatus = CardFulfillmentStatus.Delivered;
+        DeliveredAt = deliveredAt;
+    }
+
+    public void MarkReturned(DateTimeOffset asOf)
+    {
+        if (FulfillmentStatus is not (CardFulfillmentStatus.Pending or CardFulfillmentStatus.Shipped))
+            throw new InvalidCardFulfillmentStateException(Id, FulfillmentStatus, "mark as returned");
+
+        FulfillmentStatus = CardFulfillmentStatus.Returned;
+    }
+
+    public void MarkFailed(DateTimeOffset asOf)
+    {
+        if (FulfillmentStatus is not (CardFulfillmentStatus.Pending or CardFulfillmentStatus.Shipped))
+            throw new InvalidCardFulfillmentStateException(Id, FulfillmentStatus, "mark as failed");
+
+        FulfillmentStatus = CardFulfillmentStatus.Failed;
+    }
+
+    /// <summary>The customer confirming receipt - the one action that actually unlocks
+    /// spending on a physical card (see EnsureCanSpend). Activating while still only
+    /// Shipped (the admin never separately marked it Delivered) also bumps
+    /// FulfillmentStatus to Delivered here - activation itself is proof of delivery, so
+    /// there's nothing extra to track.</summary>
+    public void Activate(DateTimeOffset activatedAt)
+    {
+        if (FulfillmentStatus is not (CardFulfillmentStatus.Shipped or CardFulfillmentStatus.Delivered))
+            throw new InvalidCardFulfillmentStateException(Id, FulfillmentStatus, "activate");
+
+        if (FulfillmentStatus == CardFulfillmentStatus.Shipped)
+        {
+            FulfillmentStatus = CardFulfillmentStatus.Delivered;
+            DeliveredAt = activatedAt;
+        }
+
+        IsActivated = true;
     }
 }

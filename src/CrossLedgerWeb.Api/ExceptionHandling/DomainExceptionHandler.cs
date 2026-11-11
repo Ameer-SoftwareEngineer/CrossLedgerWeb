@@ -42,6 +42,8 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             CardNotFoundException => (StatusCodes.Status404NotFound, "Card not found", "CARD_NOT_FOUND"),
             TrustedDeviceNotFoundException => (StatusCodes.Status404NotFound, "Trusted device not found", "TRUSTED_DEVICE_NOT_FOUND"),
             InvalidCardStateException => (StatusCodes.Status409Conflict, "Card does not allow this action", "INVALID_CARD_STATE"),
+            InvalidCardFulfillmentStateException => (StatusCodes.Status409Conflict, "Card fulfillment does not allow this action", "INVALID_CARD_FULFILLMENT_STATE"),
+            CardNotActivatedException => (StatusCodes.Status409Conflict, "Card has not been activated", "CARD_NOT_ACTIVATED"),
             CardSpendingLimitExceededException => (StatusCodes.Status409Conflict, "Card spending limit exceeded", "CARD_SPENDING_LIMIT_EXCEEDED"),
             MerchantSettlementWalletNotConfiguredException => (StatusCodes.Status500InternalServerError, "Merchant settlement wallet not configured", "MERCHANT_SETTLEMENT_WALLET_MISSING"),
             InsufficientFundsException => (StatusCodes.Status409Conflict, "Insufficient funds", "INSUFFICIENT_FUNDS"),

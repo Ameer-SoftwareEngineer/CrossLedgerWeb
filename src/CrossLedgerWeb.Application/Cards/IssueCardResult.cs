@@ -14,4 +14,6 @@ public sealed record IssueCardResult(
     int ExpiryYear,
     CardStatus Status,
     decimal Balance,
-    DateTimeOffset IssuedAt);
+    DateTimeOffset IssuedAt,
+    CardFulfillmentStatus FulfillmentStatus,
+    bool IsActivated);

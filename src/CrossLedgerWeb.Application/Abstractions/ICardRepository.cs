@@ -19,6 +19,11 @@ public interface ICardRepository
     /// card still awaiting Approve/Reject, oldest first.</summary>
     Task<IReadOnlyList<Card>> ListPendingApprovalAsync(CancellationToken cancellationToken);
 
+    /// <summary>Backs the Admin Console's "Card Fulfillment" tab (specification 12.4/19) -
+    /// every physical card still awaiting a shipping action (Pending/Shipped), plus
+    /// Delivered-but-not-yet-activated ones so support can see those too.</summary>
+    Task<IReadOnlyList<Card>> ListAwaitingFulfillmentAsync(CancellationToken cancellationToken);
+
     /// <summary>Stages a new card for insertion - committed by UnitOfWorkBehavior's
     /// SaveChanges at the end of the pipeline, not immediately.</summary>
     void Add(Card card);

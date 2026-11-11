@@ -74,6 +74,14 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
             .HasConversion(plain => plain == null ? null : _cardDataProtector.Protect(plain), encrypted => encrypted == null ? null : _cardDataProtector.Unprotect(encrypted))
             .HasColumnName("EncryptedPin")
             .HasMaxLength(512);
+
+        builder.Property(c => c.FulfillmentStatus).HasConversion<string>().HasMaxLength(20);
+        builder.Property(c => c.ShippingCarrier).HasMaxLength(100);
+        builder.Property(c => c.TrackingNumber).HasMaxLength(100);
+        builder.Property(c => c.ShippedAt);
+        builder.Property(c => c.DeliveredAt);
+        builder.Property(c => c.IsActivated);
+        builder.Property(c => c.ReplacesCardId).HasConversion(new CardIdConverter());
         builder.Property(c => c.StripeCardholderId).HasMaxLength(255);
         builder.Property(c => c.StripeCardId).HasMaxLength(255);
 

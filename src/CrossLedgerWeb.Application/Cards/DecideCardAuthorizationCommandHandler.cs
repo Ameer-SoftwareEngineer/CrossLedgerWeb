@@ -111,6 +111,10 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         {
             declineReason = "card_not_active";
         }
+        catch (CardNotActivatedException)
+        {
+            declineReason = "card_not_activated";
+        }
         catch (CardSpendingLimitExceededException)
         {
             declineReason = "spending_limit_exceeded";

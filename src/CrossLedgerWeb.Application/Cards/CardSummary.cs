@@ -20,4 +20,9 @@ public sealed record CardSummary(
     IReadOnlySet<string> AllowedCountries,
     decimal? DailySpendingLimit,
     decimal? MonthlySpendingLimit,
-    bool HasPin);
+    bool HasPin,
+    CardFulfillmentStatus FulfillmentStatus,
+    string? ShippingCarrier,
+    string? TrackingNumber,
+    bool IsActivated,
+    CardId? ReplacesCardId);

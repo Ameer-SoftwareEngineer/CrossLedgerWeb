@@ -50,6 +50,7 @@ public sealed class IssueCardCommandHandler : IRequestHandler<IssueCardCommand, 
 
         return new IssueCardResult(
             card.Id, card.CardWalletId, card.Currency, card.CardType, card.CardholderName, card.Last4,
-            card.ExpiryMonth, card.ExpiryYear, card.Status, cardWallet.Balance.Amount, card.IssuedAt);
+            card.ExpiryMonth, card.ExpiryYear, card.Status, cardWallet.Balance.Amount, card.IssuedAt,
+            card.FulfillmentStatus, card.IsActivated);
     }
 }

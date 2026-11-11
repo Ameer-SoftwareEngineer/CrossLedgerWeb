@@ -230,6 +230,9 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("DailySpendingLimit")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("EmployerCompanyName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -245,6 +248,14 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ExpiryYear")
                         .HasColumnType("int");
+
+                    b.Property<string>("FulfillmentStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("IsActivated")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsActivelyEmployed")
                         .HasColumnType("bit");
@@ -273,6 +284,16 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(512)")
                         .HasColumnName("EncryptedPin");
 
+                    b.Property<Guid?>("ReplacesCardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ShippedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ShippingCarrier")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("SourceOfFunds")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -293,6 +314,10 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<string>("StripeCardholderId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("TrackingNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.ComplexProperty<Dictionary<string, object>>("RegisteredAddress", "CrossLedgerWeb.Domain.Cards.Card.RegisteredAddress#CardAddress", b1 =>
                         {

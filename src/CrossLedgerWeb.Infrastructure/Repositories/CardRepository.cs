@@ -30,5 +30,14 @@ public sealed class CardRepository : ICardRepository
             .OrderBy(c => c.IssuedAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Card>> ListAwaitingFulfillmentAsync(CancellationToken cancellationToken) =>
+        await _db.Cards
+            .Where(c => c.CardType == CardType.Physical && (
+                c.FulfillmentStatus == CardFulfillmentStatus.Pending
+                || c.FulfillmentStatus == CardFulfillmentStatus.Shipped
+                || (c.FulfillmentStatus == CardFulfillmentStatus.Delivered && !c.IsActivated)))
+            .OrderBy(c => c.IssuedAt)
+            .ToListAsync(cancellationToken);
+
     public void Add(Card card) => _db.Cards.Add(card);
 }
