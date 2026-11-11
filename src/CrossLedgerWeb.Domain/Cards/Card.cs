@@ -52,6 +52,15 @@ public sealed class Card
     public decimal? DailySpendingLimit { get; private set; }
     public decimal? MonthlySpendingLimit { get; private set; }
 
+    /// <summary>Null until first set. Unlike Pan/Cvv there is no "reveal" for this - real
+    /// issuers never let you read back an existing PIN, only set a new one, so this is
+    /// set/change only (see SetPin). Encrypted at rest the same way Pan/Cvv are.</summary>
+    public string? Pin { get; private set; }
+
+    /// <summary>For the frontend/response to know whether to say "Set PIN" or "Change
+    /// PIN" without ever exposing the PIN itself.</summary>
+    public bool HasPin => Pin is not null;
+
     // Captured once at issuance, same spirit as a real card issuer's KYC intake -
     // display/record-keeping only, nothing else on this entity reads these.
     public SourceOfFunds SourceOfFunds { get; }
@@ -160,6 +169,7 @@ public sealed class Card
         IReadOnlySet<string> allowedCountries,
         decimal? dailySpendingLimit,
         decimal? monthlySpendingLimit,
+        string? pin,
         SourceOfFunds sourceOfFunds,
         decimal estimatedGrossAnnualIncome,
         decimal estimatedNetWorth,
@@ -187,6 +197,7 @@ public sealed class Card
         AllowedCountries = allowedCountries;
         DailySpendingLimit = dailySpendingLimit;
         MonthlySpendingLimit = monthlySpendingLimit;
+        Pin = pin;
         SourceOfFunds = sourceOfFunds;
         EstimatedGrossAnnualIncome = estimatedGrossAnnualIncome;
         EstimatedNetWorth = estimatedNetWorth;
@@ -274,6 +285,17 @@ public sealed class Card
         AllowedCountries = allowedCountries;
         DailySpendingLimit = dailyLimit;
         MonthlySpendingLimit = monthlyLimit;
+    }
+
+    /// <summary>Sets or changes this card's PIN - no "reveal," see Pin's own doc comment.
+    /// Any card state (including PendingApproval) can have a PIN set, since the API
+    /// layer's step-up gating is what actually protects this, not a status guard here.</summary>
+    public void SetPin(string pin)
+    {
+        if (pin.Length != 4 || !pin.All(char.IsDigit))
+            throw new ArgumentException("The PIN must be exactly 4 digits.", nameof(pin));
+
+        Pin = pin;
     }
 
     /// <summary>Throws if this card cannot be used for a purchase of this amount right

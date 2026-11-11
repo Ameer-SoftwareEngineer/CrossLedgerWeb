@@ -19,4 +19,5 @@ public sealed record CardSummary(
     IReadOnlySet<string> BlockedMerchantCategoryCodes,
     IReadOnlySet<string> AllowedCountries,
     decimal? DailySpendingLimit,
-    decimal? MonthlySpendingLimit);
+    decimal? MonthlySpendingLimit,
+    bool HasPin);

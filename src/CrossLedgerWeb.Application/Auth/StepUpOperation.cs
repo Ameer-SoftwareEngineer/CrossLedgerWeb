@@ -11,4 +11,12 @@ public enum StepUpOperation
     ChangeSpendingLimits,
     DisableTwoFactor,
     ChangePasswordOrEmail,
+
+    /// <summary>At least as sensitive as ChangeSpendingLimits/RevealCardDetails - same
+    /// unconditional (no threshold) gating.</summary>
+    ChangeCardPin,
+
+    /// <summary>Replacing a card (lost/stolen) closes the old one and issues a new one -
+    /// at least as sensitive as changing its spending limits.</summary>
+    ReissueCard,
 }

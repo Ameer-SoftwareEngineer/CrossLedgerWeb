@@ -16,4 +16,5 @@ public sealed record CardResponse(
     IReadOnlyList<string> BlockedMerchantCategoryCodes,
     IReadOnlyList<string> AllowedCountries,
     decimal? DailySpendingLimit,
-    decimal? MonthlySpendingLimit);
+    decimal? MonthlySpendingLimit,
+    bool HasPin);

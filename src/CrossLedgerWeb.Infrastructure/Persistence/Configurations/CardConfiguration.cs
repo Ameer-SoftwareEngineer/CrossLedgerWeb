@@ -69,6 +69,11 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
 
         builder.Property(c => c.DailySpendingLimit).HasColumnType("decimal(18,2)");
         builder.Property(c => c.MonthlySpendingLimit).HasColumnType("decimal(18,2)");
+
+        builder.Property(c => c.Pin)
+            .HasConversion(plain => plain == null ? null : _cardDataProtector.Protect(plain), encrypted => encrypted == null ? null : _cardDataProtector.Unprotect(encrypted))
+            .HasColumnName("EncryptedPin")
+            .HasMaxLength(512);
         builder.Property(c => c.StripeCardholderId).HasMaxLength(255);
         builder.Property(c => c.StripeCardId).HasMaxLength(255);
 

@@ -268,6 +268,11 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(512)")
                         .HasColumnName("EncryptedPan");
 
+                    b.Property<string>("Pin")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)")
+                        .HasColumnName("EncryptedPin");
+
                     b.Property<string>("SourceOfFunds")
                         .IsRequired()
                         .HasMaxLength(30)
