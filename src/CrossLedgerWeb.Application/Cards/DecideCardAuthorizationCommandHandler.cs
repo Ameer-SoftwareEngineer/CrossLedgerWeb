@@ -31,6 +31,7 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
 {
     private readonly ICardRepository _cards;
     private readonly ICardAuthorizationRepository _authorizations;
+    private readonly ICardPurchaseRepository _purchases;
     private readonly IWalletRepository _wallets;
     private readonly IClock _clock;
     private readonly IOptions<CardIssuingOptions> _options;
@@ -39,6 +40,7 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
     public DecideCardAuthorizationCommandHandler(
         ICardRepository cards,
         ICardAuthorizationRepository authorizations,
+        ICardPurchaseRepository purchases,
         IWalletRepository wallets,
         IClock clock,
         IOptions<CardIssuingOptions> options,
@@ -46,6 +48,7 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
     {
         _cards = cards;
         _authorizations = authorizations;
+        _purchases = purchases;
         _wallets = wallets;
         _clock = clock;
         _options = options;
@@ -115,6 +118,34 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         catch (InsufficientFundsException)
         {
             declineReason = "insufficient_funds";
+        }
+
+        // Policy checks beyond Card's own invariants - these need the current
+        // authorization attempt's merchant data and purchase history, neither of which
+        // Card.EnsureCanSpend has access to, so they live here rather than as thrown
+        // domain exceptions.
+        if (declineReason is null && request.MerchantCategoryCode is { } mcc && card.BlockedMerchantCategoryCodes.Contains(mcc))
+        {
+            declineReason = "card_category_blocked";
+        }
+
+        if (declineReason is null && request.MerchantCountry is { } country && card.AllowedCountries.Count > 0 && !card.AllowedCountries.Contains(country))
+        {
+            declineReason = "country_not_allowed";
+        }
+
+        if (declineReason is null && card.DailySpendingLimit is { } dailyLimit)
+        {
+            var spentToday = await _purchases.GetSpendTotalAsync(card.Id, _clock.UtcNow - TimeSpan.FromHours(24), cancellationToken);
+            if (spentToday + amount.Amount > dailyLimit)
+                declineReason = "daily_limit_exceeded";
+        }
+
+        if (declineReason is null && card.MonthlySpendingLimit is { } monthlyLimit)
+        {
+            var spentThisMonth = await _purchases.GetSpendTotalAsync(card.Id, _clock.UtcNow - TimeSpan.FromDays(30), cancellationToken);
+            if (spentThisMonth + amount.Amount > monthlyLimit)
+                declineReason = "monthly_limit_exceeded";
         }
 
         var approved = declineReason is null;

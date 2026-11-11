@@ -15,4 +15,8 @@ public sealed record CardSummary(
     CardStatus Status,
     decimal? SpendingLimit,
     decimal Balance,
-    DateTimeOffset IssuedAt);
+    DateTimeOffset IssuedAt,
+    IReadOnlySet<string> BlockedMerchantCategoryCodes,
+    IReadOnlySet<string> AllowedCountries,
+    decimal? DailySpendingLimit,
+    decimal? MonthlySpendingLimit);

@@ -30,7 +30,13 @@ public sealed record StripeIssuingPendingRequest(
     [property: JsonPropertyName("amount")] long Amount,
     [property: JsonPropertyName("currency")] string Currency);
 
-public sealed record StripeIssuingMerchantData([property: JsonPropertyName("name")] string? Name);
+/// <summary>category_code is the raw MCC (e.g. "5734"); country is ISO-2 - both confirmed
+/// directly from Stripe's own Authorization object docs (not guessed), used by the
+/// spending-controls checks in DecideCardAuthorizationCommandHandler.</summary>
+public sealed record StripeIssuingMerchantData(
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("category_code")] string? CategoryCode,
+    [property: JsonPropertyName("country")] string? Country);
 
 /// <summary>The Transaction object a issuing_transaction.created event carries (specification
 /// 12.3/12.4's "Settlement" week), fetched directly from Stripe's own, current, publicly

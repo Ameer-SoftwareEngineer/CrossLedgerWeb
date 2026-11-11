@@ -187,6 +187,18 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AllowedCountries")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("AllowedCountriesCsv");
+
+                    b.Property<string>("BlockedMerchantCategoryCodes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("BlockedMerchantCategoryCodesCsv");
+
                     b.Property<string>("CardType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -215,6 +227,9 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(512)")
                         .HasColumnName("EncryptedCvv");
 
+                    b.Property<decimal?>("DailySpendingLimit")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("EmployerCompanyName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -240,6 +255,9 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<string>("JobTitle")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal?>("MonthlySpendingLimit")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uniqueidentifier");

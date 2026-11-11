@@ -12,4 +12,6 @@ public sealed record DecideCardAuthorizationCommand(
     string StripeCardId,
     long AmountMinorUnits,
     string CurrencyCode,
-    string MerchantName) : IRequest<DecideCardAuthorizationResult>;
+    string MerchantName,
+    string? MerchantCategoryCode = null,
+    string? MerchantCountry = null) : IRequest<DecideCardAuthorizationResult>;

@@ -53,7 +53,8 @@ public sealed class CardsController : ControllerBase
 
         return StatusCode(StatusCodes.Status201Created, ToResponse(
             result.CardId, result.CardWalletId, result.Currency, result.CardType, result.CardholderName,
-            result.Last4, result.ExpiryMonth, result.ExpiryYear, result.Status, null, result.Balance, result.IssuedAt));
+            result.Last4, result.ExpiryMonth, result.ExpiryYear, result.Status, null, result.Balance, result.IssuedAt,
+            Array.Empty<string>(), Array.Empty<string>(), null, null));
     }
 
     [HttpGet]
@@ -67,7 +68,8 @@ public sealed class CardsController : ControllerBase
 
         var response = cards.Select(c => ToResponse(
             c.CardId, c.CardWalletId, c.Currency, c.CardType, c.CardholderName, c.Last4,
-            c.ExpiryMonth, c.ExpiryYear, c.Status, c.SpendingLimit, c.Balance, c.IssuedAt)).ToList();
+            c.ExpiryMonth, c.ExpiryYear, c.Status, c.SpendingLimit, c.Balance, c.IssuedAt,
+            c.BlockedMerchantCategoryCodes.ToList(), c.AllowedCountries.ToList(), c.DailySpendingLimit, c.MonthlySpendingLimit)).ToList();
 
         return Ok(response);
     }
@@ -155,6 +157,29 @@ public sealed class CardsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>MCC block list, country allow-list, and the two rolling-window spend caps
+    /// (specification 12.2/12.4) - separate from spending-limit above, which stays scoped
+    /// to the original per-purchase cap. Same step-up policy row (ChangeSpendingLimits) -
+    /// this is still "changing spending limits" per specification 6.2.</summary>
+    [HttpPut("{cardId:guid}/spending-controls")]
+    [RequireStepUp(Operation = StepUpOperation.ChangeSpendingLimits)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> SetSpendingControls(Guid cardId, SetCardSpendingControlsRequest request, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        await _mediator.Send(
+            new SetCardSpendingControlsCommand(
+                new CardId(cardId), userId,
+                request.BlockedMerchantCategoryCodes.ToHashSet(),
+                request.AllowedCountries.ToHashSet(),
+                request.DailyLimit, request.MonthlyLimit),
+            cancellationToken);
+
+        return NoContent();
+    }
+
     /// <summary>No real merchant or card network is involved - this just posts the same
     /// shape of ledger entries a real purchase would, so it shows up in Transaction
     /// History like any other debit.</summary>
@@ -219,8 +244,10 @@ public sealed class CardsController : ControllerBase
 
     private static CardResponse ToResponse(
         CardId cardId, WalletId cardWalletId, Currency currency, CardType cardType, string cardholderName,
-        string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, decimal balance, DateTimeOffset issuedAt) =>
-        new(cardId.Value, cardWalletId.Value, currency.Code, cardType.ToString(), cardholderName, last4, expiryMonth, expiryYear, status.ToString(), spendingLimit, balance, issuedAt);
+        string last4, int expiryMonth, int expiryYear, CardStatus status, decimal? spendingLimit, decimal balance, DateTimeOffset issuedAt,
+        IReadOnlyList<string> blockedMerchantCategoryCodes, IReadOnlyList<string> allowedCountries, decimal? dailySpendingLimit, decimal? monthlySpendingLimit) =>
+        new(cardId.Value, cardWalletId.Value, currency.Code, cardType.ToString(), cardholderName, last4, expiryMonth, expiryYear, status.ToString(), spendingLimit, balance, issuedAt,
+            blockedMerchantCategoryCodes, allowedCountries, dailySpendingLimit, monthlySpendingLimit);
 
     private static Domain.Cards.CardAddress ToDomainAddress(CardAddressDto dto) =>
         new(dto.Street, dto.Number, dto.State, dto.Postcode, dto.City, dto.Country);

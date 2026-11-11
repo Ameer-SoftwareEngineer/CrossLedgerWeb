@@ -2,6 +2,7 @@ using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Infrastructure.Persistence.Converters;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CrossLedgerWeb.Infrastructure.Persistence.Configurations;
@@ -52,6 +53,22 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.SpendingLimit).HasColumnType("decimal(18,2)");
         builder.Property(c => c.ClosedAt);
+
+        // Stored as a comma-joined string rather than a child table - the lists are short
+        // and rarely change, so this avoids the overhead of a separate aggregate for what's
+        // really just two small configuration lists on the card itself.
+        builder.Property(c => c.BlockedMerchantCategoryCodes)
+            .HasConversion(set => string.Join(',', set), csv => ParseStringSet(csv), new StringSetValueComparer())
+            .HasColumnName("BlockedMerchantCategoryCodesCsv")
+            .HasMaxLength(500);
+
+        builder.Property(c => c.AllowedCountries)
+            .HasConversion(set => string.Join(',', set), csv => ParseStringSet(csv), new StringSetValueComparer())
+            .HasColumnName("AllowedCountriesCsv")
+            .HasMaxLength(500);
+
+        builder.Property(c => c.DailySpendingLimit).HasColumnType("decimal(18,2)");
+        builder.Property(c => c.MonthlySpendingLimit).HasColumnType("decimal(18,2)");
         builder.Property(c => c.StripeCardholderId).HasMaxLength(255);
         builder.Property(c => c.StripeCardId).HasMaxLength(255);
 
@@ -87,5 +104,18 @@ public sealed class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Ignore(c => c.Last4);
 
         builder.HasIndex(c => c.OwnerId);
+    }
+
+    private static IReadOnlySet<string> ParseStringSet(string csv) =>
+        string.IsNullOrEmpty(csv) ? new HashSet<string>() : csv.Split(',').ToHashSet();
+
+    private sealed class StringSetValueComparer : ValueComparer<IReadOnlySet<string>>
+    {
+        public StringSetValueComparer() : base(
+            (a, b) => a!.SetEquals(b!),
+            set => set.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
+            set => new HashSet<string>(set))
+        {
+        }
     }
 }

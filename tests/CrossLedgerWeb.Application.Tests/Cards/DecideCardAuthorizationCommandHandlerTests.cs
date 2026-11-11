@@ -20,6 +20,7 @@ public class DecideCardAuthorizationCommandHandlerTests
 
     private readonly Mock<ICardRepository> _cards = new();
     private readonly Mock<ICardAuthorizationRepository> _authorizations = new();
+    private readonly Mock<ICardPurchaseRepository> _purchases = new();
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<IClock> _clock = new();
     private readonly CardIssuingOptions _options = new() { AuthorizationHoldDays = 7 };
@@ -29,10 +30,12 @@ public class DecideCardAuthorizationCommandHandlerTests
         _clock.Setup(x => x.UtcNow).Returns(Now);
         _authorizations.Setup(x => x.GetByStripeAuthorizationIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((CardAuthorization?)null);
+        _purchases.Setup(x => x.GetSpendTotalAsync(It.IsAny<CardId>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
     }
 
     private DecideCardAuthorizationCommandHandler CreateHandler() => new(
-        _cards.Object, _authorizations.Object, _wallets.Object, _clock.Object,
+        _cards.Object, _authorizations.Object, _purchases.Object, _wallets.Object, _clock.Object,
         Options.Create(_options), NullLogger<DecideCardAuthorizationCommandHandler>.Instance);
 
     private static Card NewCard()
@@ -45,8 +48,9 @@ public class DecideCardAuthorizationCommandHandlerTests
         return card;
     }
 
-    private static DecideCardAuthorizationCommand Command(long amountMinorUnits = 2500, string currency = "usd") =>
-        new(StripeAuthorizationId, StripeCardId, amountMinorUnits, currency, "Stripe Coffee Co");
+    private static DecideCardAuthorizationCommand Command(
+        long amountMinorUnits = 2500, string currency = "usd", string? merchantCategoryCode = null, string? merchantCountry = null) =>
+        new(StripeAuthorizationId, StripeCardId, amountMinorUnits, currency, "Stripe Coffee Co", merchantCategoryCode, merchantCountry);
 
     private void SetUpFundedCard(Card card, decimal balance, Money? openHoldTotal = null)
     {
@@ -187,5 +191,69 @@ public class DecideCardAuthorizationCommandHandlerTests
         result.DeclineReason.Should().Be("insufficient_funds");
         _cards.Verify(x => x.GetByStripeCardIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _authorizations.Verify(x => x.Add(It.IsAny<CardAuthorization>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_declines_as_card_category_blocked_when_the_merchant_category_is_on_the_block_list()
+    {
+        var card = NewCard();
+        card.Approve();
+        card.SetSpendingControls(new HashSet<string> { "7995" }, new HashSet<string>(), null, null);
+        SetUpFundedCard(card, balance: 100m);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(Command(merchantCategoryCode: "7995"), CancellationToken.None);
+
+        result.Approved.Should().BeFalse();
+        result.DeclineReason.Should().Be("card_category_blocked");
+    }
+
+    [Fact]
+    public async Task Handle_declines_as_country_not_allowed_when_the_merchant_country_is_not_on_the_allow_list()
+    {
+        var card = NewCard();
+        card.Approve();
+        card.SetSpendingControls(new HashSet<string>(), new HashSet<string> { "US" }, null, null);
+        SetUpFundedCard(card, balance: 100m);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(Command(merchantCountry: "FR"), CancellationToken.None);
+
+        result.Approved.Should().BeFalse();
+        result.DeclineReason.Should().Be("country_not_allowed");
+    }
+
+    [Fact]
+    public async Task Handle_declines_as_daily_limit_exceeded_when_todays_spend_plus_this_amount_is_over_the_cap()
+    {
+        var card = NewCard();
+        card.Approve();
+        card.SetSpendingControls(new HashSet<string>(), new HashSet<string>(), dailyLimit: 30m, monthlyLimit: null);
+        SetUpFundedCard(card, balance: 100m);
+        _purchases.Setup(x => x.GetSpendTotalAsync(card.Id, Now - TimeSpan.FromHours(24), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(10m);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None); // $10 already + $25 > $30
+
+        result.Approved.Should().BeFalse();
+        result.DeclineReason.Should().Be("daily_limit_exceeded");
+    }
+
+    [Fact]
+    public async Task Handle_declines_as_monthly_limit_exceeded_when_this_months_spend_plus_this_amount_is_over_the_cap()
+    {
+        var card = NewCard();
+        card.Approve();
+        card.SetSpendingControls(new HashSet<string>(), new HashSet<string>(), dailyLimit: null, monthlyLimit: 40m);
+        SetUpFundedCard(card, balance: 100m);
+        _purchases.Setup(x => x.GetSpendTotalAsync(card.Id, Now - TimeSpan.FromDays(30), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(20m);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None); // $20 already + $25 > $40
+
+        result.Approved.Should().BeFalse();
+        result.DeclineReason.Should().Be("monthly_limit_exceeded");
     }
 }

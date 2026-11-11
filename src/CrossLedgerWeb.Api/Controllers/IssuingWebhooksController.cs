@@ -84,7 +84,9 @@ public sealed class IssuingWebhooksController : ControllerBase
                 authorization.Card.Id,
                 pendingRequest.Amount,
                 pendingRequest.Currency,
-                authorization.MerchantData?.Name ?? "Unknown merchant"),
+                authorization.MerchantData?.Name ?? "Unknown merchant",
+                authorization.MerchantData?.CategoryCode,
+                authorization.MerchantData?.Country),
             cancellationToken);
 
         SetStripeVersionHeader();

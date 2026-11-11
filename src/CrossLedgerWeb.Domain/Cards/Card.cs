@@ -34,6 +34,24 @@ public sealed class Card
     public decimal? SpendingLimit { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
+    /// <summary>Raw merchant category codes (e.g. "7995" for gambling) this card refuses
+    /// to authorize against - empty means no category restriction. Checked by
+    /// DecideCardAuthorizationCommandHandler against the webhook's own merchant_data, not
+    /// by this entity (it has no notion of "the current authorization attempt").</summary>
+    public IReadOnlySet<string> BlockedMerchantCategoryCodes { get; private set; } = new HashSet<string>();
+
+    /// <summary>ISO-2 country codes this card may be used in - empty means unrestricted,
+    /// same "empty/null = no restriction" convention SpendingLimit already uses.</summary>
+    public IReadOnlySet<string> AllowedCountries { get; private set; } = new HashSet<string>();
+
+    /// <summary>Rolling 24h / 30-day spend caps (from the moment of the authorization
+    /// attempt, not calendar day/month boundaries - the same rolling-window reasoning
+    /// AuthorizationHoldDays already uses, avoiding timezone/month-length edge cases).
+    /// Measured against captured CardPurchase history, not open holds - see
+    /// DecideCardAuthorizationCommandHandler.</summary>
+    public decimal? DailySpendingLimit { get; private set; }
+    public decimal? MonthlySpendingLimit { get; private set; }
+
     // Captured once at issuance, same spirit as a real card issuer's KYC intake -
     // display/record-keeping only, nothing else on this entity reads these.
     public SourceOfFunds SourceOfFunds { get; }
@@ -138,6 +156,10 @@ public sealed class Card
         CardStatus status,
         decimal? spendingLimit,
         DateTimeOffset? closedAt,
+        IReadOnlySet<string> blockedMerchantCategoryCodes,
+        IReadOnlySet<string> allowedCountries,
+        decimal? dailySpendingLimit,
+        decimal? monthlySpendingLimit,
         SourceOfFunds sourceOfFunds,
         decimal estimatedGrossAnnualIncome,
         decimal estimatedNetWorth,
@@ -161,6 +183,10 @@ public sealed class Card
         Status = status;
         SpendingLimit = spendingLimit;
         ClosedAt = closedAt;
+        BlockedMerchantCategoryCodes = blockedMerchantCategoryCodes;
+        AllowedCountries = allowedCountries;
+        DailySpendingLimit = dailySpendingLimit;
+        MonthlySpendingLimit = monthlySpendingLimit;
         SourceOfFunds = sourceOfFunds;
         EstimatedGrossAnnualIncome = estimatedGrossAnnualIncome;
         EstimatedNetWorth = estimatedNetWorth;
@@ -226,6 +252,28 @@ public sealed class Card
             throw new ArgumentOutOfRangeException(nameof(limit), limit, "The spending limit cannot be negative.");
 
         SpendingLimit = limit;
+    }
+
+    /// <summary>One combined setter (one step-up-gated save action) for the MCC block
+    /// list, country allow-list, and the two rolling-window spend caps - kept together
+    /// because the frontend presents them as a single "spending controls" editor, the same
+    /// way SetSpendingLimit is its own separate action for the per-purchase cap.</summary>
+    public void SetSpendingControls(
+        IReadOnlySet<string> blockedMerchantCategoryCodes,
+        IReadOnlySet<string> allowedCountries,
+        decimal? dailyLimit,
+        decimal? monthlyLimit)
+    {
+        if (dailyLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(dailyLimit), dailyLimit, "The daily spending limit cannot be negative.");
+
+        if (monthlyLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyLimit), monthlyLimit, "The monthly spending limit cannot be negative.");
+
+        BlockedMerchantCategoryCodes = blockedMerchantCategoryCodes;
+        AllowedCountries = allowedCountries;
+        DailySpendingLimit = dailyLimit;
+        MonthlySpendingLimit = monthlyLimit;
     }
 
     /// <summary>Throws if this card cannot be used for a purchase of this amount right

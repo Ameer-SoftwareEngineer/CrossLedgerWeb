@@ -12,4 +12,8 @@ public sealed record CardResponse(
     string Status,
     decimal? SpendingLimit,
     decimal Balance,
-    DateTimeOffset IssuedAt);
+    DateTimeOffset IssuedAt,
+    IReadOnlyList<string> BlockedMerchantCategoryCodes,
+    IReadOnlyList<string> AllowedCountries,
+    decimal? DailySpendingLimit,
+    decimal? MonthlySpendingLimit);
