@@ -9,8 +9,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_GetTransactionHistory (versioned in the separate
-/// CrossLedgerDatabase project) directly through Dapper - specification 4's decision
+/// <summary>Calls dbo.usp_GetTransactionHistory (source in
+/// db/procedures/usp_GetTransactionHistory.sql) directly through Dapper - specification 4's decision
 /// rule for set-based, server-side-paged reads, deliberately bypassing EF Core and the
 /// Wallet aggregate for this read-only path.</summary>
 public sealed class TransactionHistoryReader : ITransactionHistoryReader

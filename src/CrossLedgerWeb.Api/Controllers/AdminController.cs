@@ -149,6 +149,35 @@ public sealed class AdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Authorization holds stuck on an over-capture the card wallet couldn't
+    /// cover (specification 12.3's "partial and incremental captures" taken to its unhappy
+    /// extreme) - CaptureCardAuthorizationCommandHandler's own doc comment covers why this
+    /// exists instead of a silent log line.</summary>
+    [HttpGet("cards/authorizations/pending-manual-review")]
+    [ProducesResponseType<IReadOnlyList<CardAuthorizationPendingManualReviewResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CardAuthorizationPendingManualReviewResponse>>> ListCardAuthorizationsPendingManualReview(CancellationToken cancellationToken)
+    {
+        var pending = await _mediator.Send(new ListCardAuthorizationsPendingManualReviewQuery(), cancellationToken);
+
+        var response = pending
+            .Select(p => new CardAuthorizationPendingManualReviewResponse(
+                p.CardAuthorizationId.Value, p.CardId.Value, p.CardholderName, p.MerchantName, p.Amount, p.CurrencyCode,
+                p.AttemptedCaptureAmount, p.ManualReviewReason, p.DecidedAt, p.ManualReviewFlaggedAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>A deliberate acknowledgment only - see
+    /// CardAuthorizationHoldStatus.ManuallyResolved's own doc comment for why this never
+    /// moves money.</summary>
+    [HttpPost("cards/authorizations/{cardAuthorizationId:guid}/resolve-manual-review")]
+    public async Task<IActionResult> ResolveCardAuthorizationManualReview(Guid cardAuthorizationId, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new ResolveCardAuthorizationManualReviewCommand(new CardAuthorizationId(cardAuthorizationId)), cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("provider-health")]
     [ProducesResponseType<IReadOnlyList<ProviderHealthResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ProviderHealthResponse>>> GetProviderHealth(CancellationToken cancellationToken)

@@ -21,7 +21,7 @@ public class DecideCardAuthorizationCommandHandlerTests
     private readonly Mock<ICardRepository> _cards = new();
     private readonly Mock<ICardAuthorizationRepository> _authorizations = new();
     private readonly Mock<ICardPurchaseRepository> _purchases = new();
-    private readonly Mock<IWalletRepository> _wallets = new();
+    private readonly Mock<ICardAuthorizationHoldReservation> _holdReservation = new();
     private readonly Mock<IClock> _clock = new();
     private readonly CardIssuingOptions _options = new() { AuthorizationHoldDays = 7 };
 
@@ -35,7 +35,7 @@ public class DecideCardAuthorizationCommandHandlerTests
     }
 
     private DecideCardAuthorizationCommandHandler CreateHandler() => new(
-        _cards.Object, _authorizations.Object, _purchases.Object, _wallets.Object, _clock.Object,
+        _cards.Object, _authorizations.Object, _purchases.Object, _holdReservation.Object, _clock.Object,
         Options.Create(_options), NullLogger<DecideCardAuthorizationCommandHandler>.Instance);
 
     private static Card NewCard()
@@ -52,24 +52,25 @@ public class DecideCardAuthorizationCommandHandlerTests
         long amountMinorUnits = 2500, string currency = "usd", string? merchantCategoryCode = null, string? merchantCountry = null) =>
         new(StripeAuthorizationId, StripeCardId, amountMinorUnits, currency, "Stripe Coffee Co", merchantCategoryCode, merchantCountry);
 
-    private void SetUpFundedCard(Card card, decimal balance, Money? openHoldTotal = null)
+    private void SetUpCard(Card card)
     {
-        var wallet = new Wallet(card.CardWalletId, Owner, card.Currency, WalletKind.Card);
-        if (balance > 0)
-            wallet.Credit(new Money(balance, card.Currency), TransferId.New(), Now.AddDays(-1));
-
         _cards.Setup(x => x.GetByStripeCardIdAsync(StripeCardId, It.IsAny<CancellationToken>())).ReturnsAsync(card);
-        _wallets.Setup(x => x.GetByIdAsync(card.CardWalletId, It.IsAny<CancellationToken>())).ReturnsAsync(wallet);
-        _authorizations.Setup(x => x.GetOpenHoldTotalAsync(card.Id, card.Currency, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(openHoldTotal ?? Money.Zero(card.Currency));
     }
 
+    private void SetUpReservation(bool approved, string? declineReason) =>
+        _holdReservation
+            .Setup(x => x.ReserveAsync(
+                It.IsAny<CardAuthorizationId>(), It.IsAny<CardId>(), It.IsAny<WalletId>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<Money>(), It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CardAuthorizationHoldReservationResult(approved, declineReason));
+
     [Fact]
-    public async Task Handle_approves_and_opens_a_hold_without_posting_a_ledger_entry()
+    public async Task Handle_approves_by_delegating_the_balance_decision_to_the_hold_reservation()
     {
         var card = NewCard();
         card.Approve();
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
+        SetUpReservation(approved: true, declineReason: null);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None);
@@ -77,17 +78,12 @@ public class DecideCardAuthorizationCommandHandlerTests
         result.Approved.Should().BeTrue();
         result.DeclineReason.Should().BeNull();
 
-        _authorizations.Verify(x => x.Add(It.IsAny<CardAuthorization>()), Times.Once);
-        _authorizations.Invocations
-            .Where(i => i.Method.Name == nameof(ICardAuthorizationRepository.Add))
-            .Select(i => (CardAuthorization)i.Arguments[0])
-            .Should().ContainSingle()
-            .Which.Should().Match<CardAuthorization>(a =>
-                a.Approved
-                && a.HoldStatus == CardAuthorizationHoldStatus.Open
-                && a.Amount.Amount == 25m
-                && a.TransferId == null
-                && a.ExpiresAt == Now + TimeSpan.FromDays(7));
+        // The reservation proc makes the decision AND inserts the audit row atomically -
+        // the handler must not also insert one via EF for this path.
+        _authorizations.Verify(x => x.Add(It.IsAny<CardAuthorization>()), Times.Never);
+        _holdReservation.Verify(x => x.ReserveAsync(
+            It.IsAny<CardAuthorizationId>(), card.Id, card.CardWalletId, StripeAuthorizationId, "Stripe Coffee Co",
+            It.Is<Money>(m => m.Amount == 25m), Now, Now + TimeSpan.FromDays(7), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -100,20 +96,23 @@ public class DecideCardAuthorizationCommandHandlerTests
             TestAddress, TestAddress, stripeCardholderId: "ich_test", stripeCardId: StripeCardId);
         card.Approve();
         card.MarkShipped("UPS", "1Z999", Now);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(), CancellationToken.None);
 
         result.Approved.Should().BeFalse();
         result.DeclineReason.Should().Be("card_not_activated");
+        _holdReservation.Verify(x => x.ReserveAsync(
+            It.IsAny<CardAuthorizationId>(), It.IsAny<CardId>(), It.IsAny<WalletId>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<Money>(), It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Handle_declines_as_card_not_active_when_the_card_is_still_pending_approval()
     {
         var card = NewCard(); // never Approved - starts PendingApproval
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(), CancellationToken.None);
@@ -128,7 +127,7 @@ public class DecideCardAuthorizationCommandHandlerTests
         var card = NewCard();
         card.Approve();
         card.SetSpendingLimit(10m);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None); // $25.00 > $10 limit
@@ -138,32 +137,20 @@ public class DecideCardAuthorizationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_declines_as_insufficient_funds_when_the_wallet_balance_is_too_low()
+    public async Task Handle_declines_as_insufficient_funds_when_the_hold_reservation_reports_no_available_balance()
     {
         var card = NewCard();
         card.Approve();
-        SetUpFundedCard(card, balance: 10m);
+        SetUpCard(card);
+        SetUpReservation(approved: false, declineReason: "insufficient_funds");
 
         var handler = CreateHandler();
-        var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None); // $25.00 > $10 balance
+        var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None);
 
         result.Approved.Should().BeFalse();
         result.DeclineReason.Should().Be("insufficient_funds");
-    }
-
-    [Fact]
-    public async Task Handle_declines_as_insufficient_funds_when_an_existing_open_hold_already_consumes_available_balance()
-    {
-        var card = NewCard();
-        card.Approve();
-        // $100 balance, $80 already held by another open authorization - only $20 available.
-        SetUpFundedCard(card, balance: 100m, openHoldTotal: new Money(80m, card.Currency));
-
-        var handler = CreateHandler();
-        var result = await handler.Handle(Command(amountMinorUnits: 2500), CancellationToken.None); // wants $25.00
-
-        result.Approved.Should().BeFalse();
-        result.DeclineReason.Should().Be("insufficient_funds");
+        // The reservation proc already inserted the declined audit row - no second EF insert.
+        _authorizations.Verify(x => x.Add(It.IsAny<CardAuthorization>()), Times.Never);
     }
 
     [Fact]
@@ -218,7 +205,7 @@ public class DecideCardAuthorizationCommandHandlerTests
         var card = NewCard();
         card.Approve();
         card.SetSpendingControls(new HashSet<string> { "7995" }, new HashSet<string>(), null, null);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(merchantCategoryCode: "7995"), CancellationToken.None);
@@ -233,7 +220,7 @@ public class DecideCardAuthorizationCommandHandlerTests
         var card = NewCard();
         card.Approve();
         card.SetSpendingControls(new HashSet<string>(), new HashSet<string> { "US" }, null, null);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
 
         var handler = CreateHandler();
         var result = await handler.Handle(Command(merchantCountry: "FR"), CancellationToken.None);
@@ -248,7 +235,7 @@ public class DecideCardAuthorizationCommandHandlerTests
         var card = NewCard();
         card.Approve();
         card.SetSpendingControls(new HashSet<string>(), new HashSet<string>(), dailyLimit: 30m, monthlyLimit: null);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
         _purchases.Setup(x => x.GetSpendTotalAsync(card.Id, Now - TimeSpan.FromHours(24), It.IsAny<CancellationToken>()))
             .ReturnsAsync(10m);
 
@@ -265,7 +252,7 @@ public class DecideCardAuthorizationCommandHandlerTests
         var card = NewCard();
         card.Approve();
         card.SetSpendingControls(new HashSet<string>(), new HashSet<string>(), dailyLimit: null, monthlyLimit: 40m);
-        SetUpFundedCard(card, balance: 100m);
+        SetUpCard(card);
         _purchases.Setup(x => x.GetSpendTotalAsync(card.Id, Now - TimeSpan.FromDays(30), It.IsAny<CancellationToken>()))
             .ReturnsAsync(20m);
 

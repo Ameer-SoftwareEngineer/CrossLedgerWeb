@@ -7,8 +7,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_ReconcileLedger (versioned in the separate
-/// CrossLedgerDatabase project) through Dapper, same as the other readers in this
+/// <summary>Calls dbo.usp_ReconcileLedger (source in
+/// db/procedures/usp_ReconcileLedger.sql) through Dapper, same as the other readers in this
 /// folder.</summary>
 public sealed class LedgerReconciliationReader : ILedgerReconciliationReader
 {

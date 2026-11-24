@@ -1,5 +1,4 @@
 using CrossLedgerWeb.Application.Abstractions;
-using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Exceptions;
 using CrossLedgerWeb.Domain.ValueObjects;
@@ -18,21 +17,24 @@ namespace CrossLedgerWeb.Application.Cards;
 /// (possibly for less than the held amount - a partial capture) - or never, if the expiry
 /// sweeper releases an uncaptured hold first.
 ///
-/// Known, unaddressed race: "available balance" below is an ordinary read (wallet balance
-/// minus the sum of this card's other Open holds), not locked the way usp_PostTransfer locks
-/// a wallet row under UPDLOCK/ROWLOCK for a transfer. Two authorization requests against the
-/// same card arriving close enough together can both read the same available balance before
-/// either's hold is inserted, and both approve - a genuine TOCTOU double-hold. Closing this
-/// needs either a serializable transaction around "sum Open holds + insert" or a dedicated
-/// stored procedure with the same locking usp_PostTransfer already uses; this slice documents
-/// the gap rather than closing it.
+/// Every decline reason that depends only on the card's own state or policy (frozen/
+/// not-active/not-activated, spending-limit-exceeded, MCC, country, daily/monthly limits)
+/// is decided here in plain C#/EF - none of those race against a concurrent request. Only
+/// the final "is there enough available balance right now" decision, and the one resulting
+/// CardAuthorizations insert, are delegated to ICardAuthorizationHoldReservation
+/// (dbo.usp_ReserveCardAuthorizationHold) - that is the one check that previously raced
+/// (two concurrent requests could both read the same available balance before either's
+/// hold landed, and both approve), and the fix is the same locking usp_PostTransfer already
+/// uses, not a C#-level lock. Insufficient-funds is decided last, after every other policy
+/// check, so the serializable lock is only taken when nothing else would already have
+/// declined the request.
 /// </summary>
 public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<DecideCardAuthorizationCommand, DecideCardAuthorizationResult>
 {
     private readonly ICardRepository _cards;
     private readonly ICardAuthorizationRepository _authorizations;
     private readonly ICardPurchaseRepository _purchases;
-    private readonly IWalletRepository _wallets;
+    private readonly ICardAuthorizationHoldReservation _holdReservation;
     private readonly IClock _clock;
     private readonly IOptions<CardIssuingOptions> _options;
     private readonly ILogger<DecideCardAuthorizationCommandHandler> _logger;
@@ -41,7 +43,7 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         ICardRepository cards,
         ICardAuthorizationRepository authorizations,
         ICardPurchaseRepository purchases,
-        IWalletRepository wallets,
+        ICardAuthorizationHoldReservation holdReservation,
         IClock clock,
         IOptions<CardIssuingOptions> options,
         ILogger<DecideCardAuthorizationCommandHandler> logger)
@@ -49,7 +51,7 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         _cards = cards;
         _authorizations = authorizations;
         _purchases = purchases;
-        _wallets = wallets;
+        _holdReservation = holdReservation;
         _clock = clock;
         _options = options;
         _logger = logger;
@@ -98,14 +100,6 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         try
         {
             card.EnsureCanSpend(amount);
-
-            var wallet = await _wallets.GetByIdAsync(card.CardWalletId, cancellationToken)
-                ?? throw new WalletNotFoundException(card.CardWalletId);
-            var openHoldTotal = await _authorizations.GetOpenHoldTotalAsync(card.Id, card.Currency, cancellationToken);
-            var available = wallet.Balance - openHoldTotal;
-
-            if (available.Amount < amount.Amount)
-                throw new InsufficientFundsException(wallet.Id, available, amount);
         }
         catch (InvalidCardStateException)
         {
@@ -118,10 +112,6 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
         catch (CardSpendingLimitExceededException)
         {
             declineReason = "spending_limit_exceeded";
-        }
-        catch (InsufficientFundsException)
-        {
-            declineReason = "insufficient_funds";
         }
 
         // Policy checks beyond Card's own invariants - these need the current
@@ -152,14 +142,27 @@ public sealed class DecideCardAuthorizationCommandHandler : IRequestHandler<Deci
                 declineReason = "monthly_limit_exceeded";
         }
 
-        var approved = declineReason is null;
-        var holdDuration = approved ? TimeSpan.FromDays(_options.Value.AuthorizationHoldDays) : (TimeSpan?)null;
-        var authorization = new CardAuthorization(
-            CardAuthorizationId.New(), card.Id, request.StripeAuthorizationId, amount,
-            request.MerchantName, approved, declineReason, holdDuration, _clock.UtcNow);
-        _authorizations.Add(authorization);
+        // Every non-financial decline is already decided - insert its audit row directly,
+        // nothing was ever held so there is no race to protect against.
+        if (declineReason is not null)
+        {
+            var declined = new CardAuthorization(
+                CardAuthorizationId.New(), card.Id, request.StripeAuthorizationId, amount,
+                request.MerchantName, approved: false, declineReason, holdDuration: null, _clock.UtcNow);
+            _authorizations.Add(declined);
+            return new DecideCardAuthorizationResult(false, declineReason);
+        }
 
-        return new DecideCardAuthorizationResult(approved, declineReason);
+        // Only the balance-vs-open-holds decision reaches here - the one check that
+        // actually races against a concurrent request. usp_ReserveCardAuthorizationHold
+        // makes the decision and inserts the resulting audit row atomically, under lock.
+        var decidedAt = _clock.UtcNow;
+        var expiresAtIfApproved = decidedAt + TimeSpan.FromDays(_options.Value.AuthorizationHoldDays);
+        var reservation = await _holdReservation.ReserveAsync(
+            CardAuthorizationId.New(), card.Id, card.CardWalletId, request.StripeAuthorizationId,
+            request.MerchantName, amount, decidedAt, expiresAtIfApproved, cancellationToken);
+
+        return new DecideCardAuthorizationResult(reservation.Approved, reservation.DeclineReason);
     }
 
     private static decimal ToDecimalAmount(long minorUnits, int decimalPlaces) =>

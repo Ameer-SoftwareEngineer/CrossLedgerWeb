@@ -9,8 +9,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Ledger;
 
-/// <summary>Calls dbo.usp_PostTransfer (versioned in the separate CrossLedgerDatabase
-/// project) through Dapper - a write, so it lives under Ledger rather than Reporting
+/// <summary>Calls dbo.usp_PostTransfer (source in db/procedures/usp_PostTransfer.sql)
+/// through Dapper - a write, so it lives under Ledger rather than Reporting
 /// alongside the read-only stored-proc callers. Backs the admin "manual transfer" tool
 /// only; the regular customer transfer flow keeps posting through the EF-based
 /// TransferPoster.</summary>

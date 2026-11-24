@@ -8,8 +8,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_GetFxRateOHLC (versioned in the separate CrossLedgerDatabase
-/// project) through Dapper - specification 4's decision rule for window-function
+/// <summary>Calls dbo.usp_GetFxRateOHLC (source in db/procedures/usp_GetFxRateOHLC.sql)
+/// through Dapper - specification 4's decision rule for window-function
 /// aggregation with no clean LINQ equivalent. dbo.FxRateSnapshots has no scheduled
 /// capture job wired up yet (specification 3.7's Week-11 Azure Functions milestone), so
 /// this genuinely returns an empty list until that exists - the procedure and this

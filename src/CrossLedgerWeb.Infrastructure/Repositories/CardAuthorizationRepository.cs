@@ -42,5 +42,13 @@ public sealed class CardAuthorizationRepository : ICardAuthorizationRepository
             .Where(a => a.HoldStatus == CardAuthorizationHoldStatus.Open && a.ExpiresAt <= asOf)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<CardAuthorization>> ListPendingManualReviewAsync(CancellationToken cancellationToken) =>
+        await _db.CardAuthorizations
+            .Where(a => a.HoldStatus == CardAuthorizationHoldStatus.PendingManualReview)
+            .ToListAsync(cancellationToken);
+
+    public Task<CardAuthorization?> GetByIdAsync(CardAuthorizationId id, CancellationToken cancellationToken) =>
+        _db.CardAuthorizations.FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
     public void Add(CardAuthorization authorization) => _db.CardAuthorizations.Add(authorization);
 }

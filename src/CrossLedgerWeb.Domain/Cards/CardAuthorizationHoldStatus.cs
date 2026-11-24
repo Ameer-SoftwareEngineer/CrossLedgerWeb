@@ -23,4 +23,19 @@ public enum CardAuthorizationHoldStatus
     /// <summary>The hold expired (or was otherwise released) without ever being captured - no
     /// ledger entry was ever created for it, so releasing it is just a status flip - terminal.</summary>
     Released,
+
+    /// <summary>A capture webhook arrived for more than the wallet could cover (an
+    /// over-capture, specification 12.3's "partial and incremental captures" taken to its
+    /// unhappy extreme) - unlike Released, the merchant's side DID actually capture the
+    /// money; CrossLedgerWeb just couldn't mirror it internally. Same spirit as the spec's
+    /// own PENDING_MANUAL state for a payout every provider rejects: funds stay reserved,
+    /// nothing is silently lost, and an admin has to look at it. Resolves to
+    /// ManuallyResolved.</summary>
+    PendingManualReview,
+
+    /// <summary>An admin acknowledged a PendingManualReview row - a deliberately simple
+    /// acknowledgment, not an automatic money movement. Deciding how to collect or write
+    /// off the shortfall is a business-policy call this terminal state does not make for
+    /// you.</summary>
+    ManuallyResolved,
 }

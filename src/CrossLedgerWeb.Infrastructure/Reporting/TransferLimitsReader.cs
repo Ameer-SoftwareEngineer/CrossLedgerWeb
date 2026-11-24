@@ -7,8 +7,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_CheckTransferLimits (versioned in the separate
-/// CrossLedgerDatabase project) through Dapper, same as the other readers in this
+/// <summary>Calls dbo.usp_CheckTransferLimits (source in
+/// db/procedures/usp_CheckTransferLimits.sql) through Dapper, same as the other readers in this
 /// folder. The rolling limit itself is configuration (Limits:RollingTransferLimitPerDay),
 /// the same way Limits:StepUpAbove is read from configuration rather than a database
 /// row today - usp_CheckTransferLimits takes it as a parameter rather than owning it.</summary>

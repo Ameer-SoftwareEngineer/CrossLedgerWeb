@@ -416,6 +416,9 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Approved")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("AttemptedCaptureAmount")
+                        .HasColumnType("decimal(19,4)");
+
                     b.Property<decimal?>("CapturedAmount")
                         .HasColumnType("decimal(19,4)");
 
@@ -436,6 +439,13 @@ namespace CrossLedgerWeb.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("ManualReviewFlaggedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ManualReviewReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("MerchantName")
                         .IsRequired()

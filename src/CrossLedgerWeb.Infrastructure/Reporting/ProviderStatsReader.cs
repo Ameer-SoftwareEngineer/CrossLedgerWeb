@@ -8,8 +8,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_GetProviderStats (versioned in the separate CrossLedgerDatabase
-/// project) through Dapper, same shape as TransferLimitsReader. Replaces
+/// <summary>Calls dbo.usp_GetProviderStats (source in db/procedures/usp_GetProviderStats.sql)
+/// through Dapper, same shape as TransferLimitsReader. Replaces
 /// DefaultProviderStatsProvider's always-full-marks placeholder now that Payouts carries
 /// enough history (ProviderCode and UpdatedAt) to compute specification 5.3's two
 /// historical signals for real. The daily volume limit is configuration

@@ -38,6 +38,18 @@ public sealed class CardAuthorization
     public DateTimeOffset DecidedAt { get; }
     public DateTimeOffset? ResolvedAt { get; private set; }
 
+    /// <summary>The amount Stripe's capture webhook actually asked for when
+    /// <see cref="FlagForManualReview"/> was raised - always in <see cref="Amount"/>'s own
+    /// currency, same convention as <see cref="CapturedAmount"/>. Null unless HoldStatus is
+    /// (or was) PendingManualReview.</summary>
+    public decimal? AttemptedCaptureAmount { get; private set; }
+    public string? ManualReviewReason { get; private set; }
+
+    /// <summary>When this got stuck - distinct from DecidedAt (the original authorization,
+    /// which could be days earlier) and from ResolvedAt (only set once an admin resolves
+    /// it).</summary>
+    public DateTimeOffset? ManualReviewFlaggedAt { get; private set; }
+
     /// <summary>holdDuration is ignored (and must be null) for a decline - nothing is ever
     /// held, so there is nothing to expire.</summary>
     public CardAuthorization(
@@ -93,7 +105,10 @@ public sealed class CardAuthorization
         string? stripeTransactionId,
         TransferId? transferId,
         DateTimeOffset decidedAt,
-        DateTimeOffset? resolvedAt)
+        DateTimeOffset? resolvedAt,
+        decimal? attemptedCaptureAmount,
+        string? manualReviewReason,
+        DateTimeOffset? manualReviewFlaggedAt)
     {
         Id = id;
         CardId = cardId;
@@ -108,6 +123,9 @@ public sealed class CardAuthorization
         TransferId = transferId;
         DecidedAt = decidedAt;
         ResolvedAt = resolvedAt;
+        AttemptedCaptureAmount = attemptedCaptureAmount;
+        ManualReviewReason = manualReviewReason;
+        ManualReviewFlaggedAt = manualReviewFlaggedAt;
         Amount = default;
     }
 
@@ -138,5 +156,33 @@ public sealed class CardAuthorization
 
         HoldStatus = CardAuthorizationHoldStatus.Released;
         ResolvedAt = releasedAt;
+    }
+
+    /// <summary>Raised when a capture webhook asks for more than the card wallet can cover
+    /// (see CaptureCardAuthorizationCommandHandler's own doc comment) - makes the stuck
+    /// state queryable and admin-actionable instead of a silent log line, same spirit as
+    /// the specification's own PENDING_MANUAL state. Not terminal yet - ResolvedAt is left
+    /// unset until <see cref="ResolveManualReview"/>.</summary>
+    public void FlagForManualReview(string reason, decimal attemptedCaptureAmount, DateTimeOffset flaggedAt)
+    {
+        if (HoldStatus != CardAuthorizationHoldStatus.Open)
+            throw new InvalidCardAuthorizationHoldStateException(Id, HoldStatus, "flag for manual review");
+
+        HoldStatus = CardAuthorizationHoldStatus.PendingManualReview;
+        ManualReviewReason = reason;
+        AttemptedCaptureAmount = attemptedCaptureAmount;
+        ManualReviewFlaggedAt = flaggedAt;
+    }
+
+    /// <summary>An admin acknowledging a PendingManualReview row - deliberately simple, no
+    /// automatic money movement (see CardAuthorizationHoldStatus.ManuallyResolved's own doc
+    /// comment for why).</summary>
+    public void ResolveManualReview(DateTimeOffset resolvedAt)
+    {
+        if (HoldStatus != CardAuthorizationHoldStatus.PendingManualReview)
+            throw new InvalidCardAuthorizationHoldStateException(Id, HoldStatus, "resolve manual review");
+
+        HoldStatus = CardAuthorizationHoldStatus.ManuallyResolved;
+        ResolvedAt = resolvedAt;
     }
 }

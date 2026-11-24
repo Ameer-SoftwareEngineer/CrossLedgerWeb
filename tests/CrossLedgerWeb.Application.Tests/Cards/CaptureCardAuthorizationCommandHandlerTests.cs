@@ -150,7 +150,7 @@ public class CaptureCardAuthorizationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_leaves_the_hold_open_and_reports_insufficient_funds_on_an_overcapture_the_wallet_cannot_cover()
+    public async Task Handle_flags_manual_review_and_reports_insufficient_funds_on_an_overcapture_the_wallet_cannot_cover()
     {
         var card = NewApprovedCard();
         var hold = NewOpenHold(card.Id, heldAmount: 25m);
@@ -164,7 +164,10 @@ public class CaptureCardAuthorizationCommandHandlerTests
 
         result.Captured.Should().BeFalse();
         result.Reason.Should().Be("insufficient_funds");
-        hold.HoldStatus.Should().Be(CardAuthorizationHoldStatus.Open);
+        hold.HoldStatus.Should().Be(CardAuthorizationHoldStatus.PendingManualReview);
+        hold.ManualReviewReason.Should().Be("insufficient_funds");
+        hold.AttemptedCaptureAmount.Should().Be(50m);
+        hold.ManualReviewFlaggedAt.Should().Be(Now);
         wallet.Balance.Amount.Should().Be(25m);
     }
 }

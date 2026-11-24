@@ -7,8 +7,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_GetWalletBalance (versioned in the separate
-/// CrossLedgerDatabase project) through Dapper, same as the other readers in this
+/// <summary>Calls dbo.usp_GetWalletBalance (source in
+/// db/procedures/usp_GetWalletBalance.sql) through Dapper, same as the other readers in this
 /// folder. The proc throws 50002 WALLET_NOT_FOUND for a missing wallet; translated to
 /// null here so the caller gets the same not-found shape GetByIdAsync does.</summary>
 public sealed class WalletBalanceReader : IWalletBalanceReader

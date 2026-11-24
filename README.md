@@ -22,9 +22,13 @@ tests/
   CrossLedgerWeb.Domain.Tests          pure unit tests, no mocks
   CrossLedgerWeb.Application.Tests     unit tests with Moq
   CrossLedgerWeb.Integration.Tests     WebApplicationFactory + Testcontainers
+db/
+  procedures/*.sql              source of record for every dbo.usp_* stored procedure;
+                                 applied via an EF Core migration (CREATE OR ALTER, so it's
+                                 safe whether the object already exists or not)
 infra/
-  docker-compose.yml            local API + SQL Server + Redis
-  main.bicep                    Azure environment as code (added during cloud-deploy milestone)
+  docker-compose.yml            local API + SQL Server
+  main.bicep                    Azure environment as code (never deployed from here - see below)
 ```
 
 Dependencies point inward only (Clean Architecture): `Domain` has no references, and outer layers depend on abstractions defined further in.
@@ -45,7 +49,7 @@ docker compose -f infra/docker-compose.yml up -d
 
 ## Status
 
-Fresh scaffold — solution and project skeletons only. Build follows the week-by-week roadmap in section 10 of the specification, starting with the Domain layer and the double-entry ledger engine.
+Phase 1 (ledger, FX, provider routing, security, Blazor front end) and Phase 2 (Stripe Issuing card issuance, real-time authorization, spending controls, PIN management, physical fulfillment and reissue) are both built and under CI. `infra/main.bicep` is authored and syntax-validated (`az bicep build`) but has never been deployed — that needs the maintainer's own Azure subscription.
 
 ## Branching
 

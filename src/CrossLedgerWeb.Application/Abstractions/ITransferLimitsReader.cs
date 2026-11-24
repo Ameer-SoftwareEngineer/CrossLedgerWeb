@@ -2,8 +2,8 @@ using CrossLedgerWeb.Domain.ValueObjects;
 
 namespace CrossLedgerWeb.Application.Abstractions;
 
-/// <summary>Backed by dbo.usp_CheckTransferLimits (versioned in the separate
-/// CrossLedgerDatabase project) - an AML rolling-24h-limit pre-check, scoped per
+/// <summary>Backed by dbo.usp_CheckTransferLimits (source in
+/// db/procedures/usp_CheckTransferLimits.sql) - an AML rolling-24h-limit pre-check, scoped per
 /// (owner, currency). It only reports; the caller decides whether to block.</summary>
 public interface ITransferLimitsReader
 {

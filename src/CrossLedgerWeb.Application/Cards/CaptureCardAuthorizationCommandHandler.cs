@@ -18,13 +18,16 @@ namespace CrossLedgerWeb.Application.Cards;
 /// simply back in available balance the moment this hold stops being Open (see
 /// DecideCardAuthorizationCommandHandler's own "available balance" calculation).
 ///
-/// Deliberately does not handle over-capture (captured amount greater than the held Amount,
-/// which Stripe explicitly permits for some merchant categories): posting more than was held
-/// debits the card wallet for the full captured amount, and if that exceeds what the wallet
-/// actually holds, Wallet.Debit throws InsufficientFundsException - caught here and logged as
-/// an unresolved error with the hold left Open, rather than silently losing money or letting a
-/// Card wallet go negative (Wallet.Debit forbids that for WalletKind.Card on purpose). A real
-/// fix needs its own slice - manual ops resolution, same spirit as spec's PENDING_MANUAL state.
+/// Handles over-capture (captured amount greater than the held Amount, which Stripe
+/// explicitly permits for some merchant categories): posting more than was held debits the
+/// card wallet for the full captured amount, and if that exceeds what the wallet actually
+/// holds, Wallet.Debit throws InsufficientFundsException (Wallet.Debit forbids a Card
+/// wallet going negative on purpose). Rather than silently losing money or letting that
+/// propagate, the hold is flagged PendingManualReview (CardAuthorization.FlagForManualReview)
+/// - a queryable, admin-actionable state, same spirit as the specification's own
+/// PENDING_MANUAL for a payout every provider rejects. The admin resolution action is a
+/// deliberate acknowledgment only, not an automatic partial-capture money movement - deciding
+/// how to collect or write off the shortfall is a business-policy call, not this handler's.
 /// </summary>
 public sealed class CaptureCardAuthorizationCommandHandler : IRequestHandler<CaptureCardAuthorizationCommand, CaptureCardAuthorizationResult>
 {
@@ -122,8 +125,11 @@ public sealed class CaptureCardAuthorizationCommandHandler : IRequestHandler<Cap
         }
         catch (InsufficientFundsException)
         {
+            var flaggedAt = _clock.UtcNow;
+            authorization.FlagForManualReview("insufficient_funds", capturedAmount.Amount, flaggedAt);
+
             _logger.LogError(
-                "Capture {StripeTransactionId} for authorization {StripeAuthorizationId} wants {CapturedAmount} but the card wallet can't cover it (likely an over-capture) - leaving the hold Open for manual resolution.",
+                "Capture {StripeTransactionId} for authorization {StripeAuthorizationId} wants {CapturedAmount} but the card wallet can't cover it (likely an over-capture) - flagged for manual review.",
                 request.StripeTransactionId, request.StripeAuthorizationId, capturedAmount);
             return new CaptureCardAuthorizationResult(Captured: false, Reason: "insufficient_funds");
         }

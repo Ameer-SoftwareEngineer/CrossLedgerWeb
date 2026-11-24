@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<ITransferLimitsReader, TransferLimitsReader>();
         services.AddScoped<IWalletBalanceReader, WalletBalanceReader>();
         services.AddScoped<IManualTransferPoster, ManualTransferPoster>();
+        services.AddScoped<ICardAuthorizationHoldReservation, CardAuthorizationHoldReservation>();
         services.AddSingleton<IClock, SystemClock>();
 
         services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));

@@ -25,6 +25,9 @@ public sealed class CardAuthorizationConfiguration : IEntityTypeConfiguration<Ca
         builder.Property(a => a.TransferId).HasConversion(new TransferIdConverter());
         builder.Property(a => a.DecidedAt);
         builder.Property(a => a.ResolvedAt);
+        builder.Property(a => a.AttemptedCaptureAmount).HasColumnType("decimal(19,4)");
+        builder.Property(a => a.ManualReviewReason).HasMaxLength(50);
+        builder.Property(a => a.ManualReviewFlaggedAt);
 
         builder.ComplexProperty(a => a.Amount, money =>
         {

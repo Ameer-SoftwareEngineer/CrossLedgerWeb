@@ -9,8 +9,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace CrossLedgerWeb.Infrastructure.Reporting;
 
-/// <summary>Calls dbo.usp_GetAccountStatement (versioned in the separate
-/// CrossLedgerDatabase project) directly through Dapper, same as TransactionHistoryReader
+/// <summary>Calls dbo.usp_GetAccountStatement (source in
+/// db/procedures/usp_GetAccountStatement.sql) directly through Dapper, same as TransactionHistoryReader
 /// and FxRateOhlcReader - deliberately bypassing EF Core and the Wallet aggregate for
 /// this read-only, window-function-backed path.</summary>
 public sealed class AccountStatementReader : IAccountStatementReader

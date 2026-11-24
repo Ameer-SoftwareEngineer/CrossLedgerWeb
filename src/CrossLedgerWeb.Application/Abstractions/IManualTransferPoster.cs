@@ -2,8 +2,8 @@ using CrossLedgerWeb.Domain.ValueObjects;
 
 namespace CrossLedgerWeb.Application.Abstractions;
 
-/// <summary>Backed by dbo.usp_PostTransfer (versioned in the separate
-/// CrossLedgerDatabase project) - posts the same four balanced ledger entries
+/// <summary>Backed by dbo.usp_PostTransfer (source in db/procedures/usp_PostTransfer.sql)
+/// - posts the same four balanced ledger entries
 /// TransferPoster.Post does in-process, but atomically in one round trip under
 /// UPDLOCK/HOLDLOCK. Used for the admin "manual transfer" tool, which moves money
 /// directly between two wallets without a Quote - the regular customer-facing transfer
