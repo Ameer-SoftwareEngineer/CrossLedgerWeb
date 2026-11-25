@@ -9,4 +9,5 @@ public sealed record CreateTransferCommand(
     WalletId SourceWalletId,
     WalletId TargetWalletId,
     decimal SourceAmount,
+    UserId CallerId,
     string IdempotencyKey) : IRequest<CreateTransferResult>, IIdempotentRequest;

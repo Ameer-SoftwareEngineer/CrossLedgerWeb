@@ -2,6 +2,7 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Admin;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Exceptions;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using CrossLedgerWeb.Domain.Wallets;
 using FluentAssertions;
@@ -14,10 +15,13 @@ public class ManualTransferCommandHandlerTests
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly Currency Pkr = Currency.From("PKR");
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly UserId AdminUserId = UserId.New();
 
     private readonly Mock<IWalletRepository> _wallets = new();
     private readonly Mock<IFxSettlementWalletResolver> _fxSettlementWallets = new();
     private readonly Mock<IManualTransferPoster> _poster = new();
+    private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
+    private readonly Mock<IRequestContextAccessor> _requestContext = new();
     private readonly Mock<IClock> _clock = new();
 
     private readonly WalletId _sourceWalletId = WalletId.New();
@@ -36,12 +40,13 @@ public class ManualTransferCommandHandlerTests
         _clock.Setup(x => x.UtcNow).Returns(Now);
     }
 
-    private ManualTransferCommandHandler CreateHandler() => new(_wallets.Object, _fxSettlementWallets.Object, _poster.Object, _clock.Object);
+    private ManualTransferCommandHandler CreateHandler() =>
+        new(_wallets.Object, _fxSettlementWallets.Object, _poster.Object, _auditLog.Object, _requestContext.Object, _clock.Object);
 
-    private ManualTransferCommand ValidCommand() => new(_sourceWalletId, _targetWalletId, 100m, 27_990m, "idem-key-1");
+    private ManualTransferCommand ValidCommand() => new(_sourceWalletId, _targetWalletId, 100m, 27_990m, AdminUserId, "idem-key-1");
 
     [Fact]
-    public async Task Handle_posts_through_the_resolved_settlement_wallets_and_returns_the_result()
+    public async Task Handle_posts_through_the_resolved_settlement_wallets_and_logs_who_posted_it()
     {
         var transferId = TransferId.New();
         _poster
@@ -55,6 +60,9 @@ public class ManualTransferCommandHandlerTests
 
         result.TransferId.Should().Be(transferId);
         result.PostedAt.Should().Be(Now);
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == AdminUserId && e.EventType == SecurityEventType.ManualTransferPosted && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

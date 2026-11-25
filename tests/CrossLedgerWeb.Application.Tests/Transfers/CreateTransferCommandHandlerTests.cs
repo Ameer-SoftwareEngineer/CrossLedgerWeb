@@ -54,7 +54,7 @@ public class CreateTransferCommandHandlerTests
         _quotes.Object, _wallets.Object, _fxSettlementWallets.Object, _transferLimits.Object, _clock.Object);
 
     private CreateTransferCommand ValidCommand(decimal sourceAmount = 100m) => new(
-        _quote.Id, _sourceWallet.Id, _targetWallet.Id, sourceAmount, "idem-key-1");
+        _quote.Id, _sourceWallet.Id, _targetWallet.Id, sourceAmount, _sourceWallet.OwnerId, "idem-key-1");
 
     [Fact]
     public async Task Handle_posts_the_transfer_and_returns_the_converted_amounts()
@@ -87,6 +87,17 @@ public class CreateTransferCommandHandlerTests
         var handler = CreateHandler();
 
         var act = () => handler.Handle(ValidCommand(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<WalletNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_caller_does_not_own_the_source_wallet()
+    {
+        var handler = CreateHandler();
+        var command = ValidCommand() with { CallerId = UserId.New() };
+
+        var act = () => handler.Handle(command, CancellationToken.None);
 
         await act.Should().ThrowAsync<WalletNotFoundException>();
     }

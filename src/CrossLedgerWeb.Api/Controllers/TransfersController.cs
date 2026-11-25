@@ -35,11 +35,15 @@ public sealed class TransfersController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
         var command = new CreateTransferCommand(
             new QuoteId(request.QuoteId),
             new WalletId(request.SourceWalletId),
             new WalletId(request.TargetWalletId),
             request.SourceAmount,
+            userId,
             idempotencyKey);
 
         var result = await _mediator.Send(command, cancellationToken);

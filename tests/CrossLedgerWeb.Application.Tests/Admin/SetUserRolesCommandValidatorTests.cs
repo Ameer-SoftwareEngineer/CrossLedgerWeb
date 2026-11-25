@@ -11,7 +11,7 @@ public class SetUserRolesCommandValidatorTests
     [Fact]
     public void Validate_passes_for_known_roles()
     {
-        var result = _validator.Validate(new SetUserRolesCommand(UserId.New(), new[] { "Customer", "Admin" }));
+        var result = _validator.Validate(new SetUserRolesCommand(UserId.New(), new[] { "Customer", "Admin" }, UserId.New()));
 
         result.IsValid.Should().BeTrue();
     }
@@ -19,7 +19,7 @@ public class SetUserRolesCommandValidatorTests
     [Fact]
     public void Validate_fails_for_an_unrecognised_role()
     {
-        var result = _validator.Validate(new SetUserRolesCommand(UserId.New(), new[] { "SuperUser" }));
+        var result = _validator.Validate(new SetUserRolesCommand(UserId.New(), new[] { "SuperUser" }, UserId.New()));
 
         result.IsValid.Should().BeFalse();
     }

@@ -52,6 +52,13 @@ public sealed class AcceptOtcRequestCommandHandler : IRequestHandler<AcceptOtcRe
         var targetWallet = await _wallets.GetByIdAsync(request.TargetWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.TargetWalletId);
 
+        // Same 404 whether the target wallet doesn't exist or simply isn't the
+        // caller's - accepting is where the requester (already confirmed above to be
+        // this same caller) picks which of their OWN wallets receives the converted
+        // funds, unlike a regular transfer's target, which is legitimately someone else's.
+        if (targetWallet.OwnerId != request.CallerId)
+            throw new WalletNotFoundException(request.TargetWalletId);
+
         var fxSettlementSource = await _fxSettlementWallets.GetSettlementWalletAsync(quote.FromCurrency, cancellationToken);
         var fxSettlementTarget = await _fxSettlementWallets.GetSettlementWalletAsync(quote.ToCurrency, cancellationToken);
 

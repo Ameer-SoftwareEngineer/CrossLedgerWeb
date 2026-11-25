@@ -7,4 +7,4 @@ namespace CrossLedgerWeb.Application.Admin;
 /// ApproveCardRequestCommand. A deliberate acknowledgment only - see
 /// CardAuthorizationHoldStatus.ManuallyResolved's own doc comment for why this never moves
 /// money.</summary>
-public sealed record ResolveCardAuthorizationManualReviewCommand(CardAuthorizationId CardAuthorizationId) : IRequest;
+public sealed record ResolveCardAuthorizationManualReviewCommand(CardAuthorizationId CardAuthorizationId, UserId AdminUserId) : IRequest;

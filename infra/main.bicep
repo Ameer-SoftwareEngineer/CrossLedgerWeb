@@ -136,6 +136,16 @@ resource apiApp 'Microsoft.Web/sites@2023-12-01' = {
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=SqlConnectionString)'
         }
         {
+          // appsettings.json ships an empty placeholder ("") for this on purpose - dev
+          // reads the real value from `dotnet user-secrets`. A real deploy from this
+          // template must not inherit that empty string: an empty HMAC signing key
+          // collapses JWT forging resistance to nothing. The secret itself (named
+          // "JwtSigningKey") is never set by this template - it's generated once and
+          // uploaded to the vault out-of-band, the same way SqlConnectionString is.
+          name: 'Jwt__SigningKey'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=JwtSigningKey)'
+        }
+        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
         }

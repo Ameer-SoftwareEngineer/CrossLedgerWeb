@@ -10,7 +10,7 @@ public class CreateTransferCommandValidatorTests
     private readonly CreateTransferCommandValidator _validator = new();
 
     private static CreateTransferCommand ValidCommand() => new(
-        QuoteId.New(), WalletId.New(), WalletId.New(), 100m, "idem-key");
+        QuoteId.New(), WalletId.New(), WalletId.New(), 100m, UserId.New(), "idem-key");
 
     [Fact]
     public void A_well_formed_command_passes()

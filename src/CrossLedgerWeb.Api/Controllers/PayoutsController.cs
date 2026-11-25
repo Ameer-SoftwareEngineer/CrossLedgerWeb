@@ -31,6 +31,9 @@ public sealed class PayoutsController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
         if (!Enum.TryParse<RoutingPreference>(request.Preference, ignoreCase: true, out var preference))
         {
             return BadRequest(new { code = "INVALID_PREFERENCE", message = $"Unknown routing preference '{request.Preference}'." });
@@ -42,6 +45,7 @@ public sealed class PayoutsController : ControllerBase
             request.DestinationCountry,
             request.Amount,
             preference,
+            userId,
             idempotencyKey);
 
         var result = await _mediator.Send(command, cancellationToken);

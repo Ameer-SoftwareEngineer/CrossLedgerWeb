@@ -3,4 +3,4 @@ using MediatR;
 
 namespace CrossLedgerWeb.Application.Admin;
 
-public sealed record RejectCardRequestCommand(CardId CardId) : IRequest;
+public sealed record RejectCardRequestCommand(CardId CardId, UserId AdminUserId) : IRequest;

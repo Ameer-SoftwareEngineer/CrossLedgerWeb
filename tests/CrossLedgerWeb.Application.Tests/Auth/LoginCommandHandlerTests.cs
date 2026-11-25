@@ -103,15 +103,20 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_throws_account_locked_when_the_account_is_locked_out()
+    public async Task Handle_throws_the_same_invalid_credentials_error_when_the_account_is_locked_out()
     {
+        // Same exception (and so the same 401) as a wrong password - a distinguishing 423
+        // would let an attacker tell which candidate emails are real accounts just by
+        // sending 5 wrong guesses and watching the response change.
         _identity.Setup(x => x.ValidateCredentialsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CredentialValidationOutcome.LockedOut);
         var handler = CreateHandler();
 
         var act = () => handler.Handle(new LoginCommand("user@example.com", "password"), CancellationToken.None);
 
-        await act.Should().ThrowAsync<AccountLockedException>();
+        await act.Should().ThrowAsync<InvalidCredentialsException>();
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.FailureReason == "AccountLocked"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

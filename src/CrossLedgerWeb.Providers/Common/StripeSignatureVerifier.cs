@@ -14,6 +14,14 @@ namespace CrossLedgerWeb.Providers.Common;
 /// </summary>
 public static class StripeSignatureVerifier
 {
+    /// <summary>Stripe's own recommended tolerance - a captured, genuinely-valid signed
+    /// payload is otherwise replayable indefinitely, since the HMAC alone never expires.
+    /// Every real caller of this (webhook deduplication by event/authorization/transaction
+    /// id) already makes replay a safe no-op, so this is defense-in-depth, not closing a
+    /// live exploit - but a timestamp with no freshness check at all is a real gap on its
+    /// own regardless of what else happens to mitigate it.</summary>
+    private static readonly TimeSpan ToleranceWindow = TimeSpan.FromMinutes(5);
+
     public static bool Verify(string payload, string signatureHeader, string secret)
     {
         var parts = signatureHeader
@@ -23,6 +31,14 @@ public static class StripeSignatureVerifier
             .ToDictionary(part => part[0], part => part[1]);
 
         if (!parts.TryGetValue("t", out var timestamp) || !parts.TryGetValue("v1", out var providedSignature))
+            return false;
+
+        if (!long.TryParse(timestamp, out var unixSeconds))
+            return false;
+
+        var signedAt = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+        var age = DateTimeOffset.UtcNow - signedAt;
+        if (age < TimeSpan.Zero || age > ToleranceWindow)
             return false;
 
         var signedPayload = $"{timestamp}.{payload}";

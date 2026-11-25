@@ -3,4 +3,4 @@ using MediatR;
 
 namespace CrossLedgerWeb.Application.Admin;
 
-public sealed record RejectRegistrationCommand(UserId UserId) : IRequest;
+public sealed record RejectRegistrationCommand(UserId UserId, UserId AdminUserId) : IRequest;

@@ -55,7 +55,6 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             SettlementWalletNotConfiguredException => (StatusCodes.Status500InternalServerError, "Settlement wallet not configured", "SETTLEMENT_WALLET_MISSING"),
             RegistrationFailedException => (StatusCodes.Status400BadRequest, "Registration failed", "REGISTRATION_FAILED"),
             InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials", "INVALID_CREDENTIALS"),
-            AccountLockedException => (StatusCodes.Status423Locked, "Account locked", "ACCOUNT_LOCKED"),
             AccountPendingApprovalException => (StatusCodes.Status403Forbidden, "Account pending approval", "ACCOUNT_PENDING_APPROVAL"),
             AccountRegistrationRejectedException => (StatusCodes.Status403Forbidden, "Registration rejected", "ACCOUNT_REGISTRATION_REJECTED"),
             InvalidRefreshTokenException => (StatusCodes.Status401Unauthorized, "Invalid refresh token", "INVALID_REFRESH_TOKEN"),

@@ -23,7 +23,7 @@ public class GetWalletBalanceQueryHandlerTests
         _wallets.Setup(x => x.GetByIdAsync(wallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(wallet);
         var handler = new GetWalletBalanceQueryHandler(_wallets.Object);
 
-        var balance = await handler.Handle(new GetWalletBalanceQuery(wallet.Id), CancellationToken.None);
+        var balance = await handler.Handle(new GetWalletBalanceQuery(wallet.Id, wallet.OwnerId), CancellationToken.None);
 
         balance.Should().Be(new Money(75m, Usd));
     }
@@ -34,7 +34,19 @@ public class GetWalletBalanceQueryHandlerTests
         _wallets.Setup(x => x.GetByIdAsync(It.IsAny<WalletId>(), It.IsAny<CancellationToken>())).ReturnsAsync((Wallet?)null);
         var handler = new GetWalletBalanceQueryHandler(_wallets.Object);
 
-        var act = () => handler.Handle(new GetWalletBalanceQuery(WalletId.New()), CancellationToken.None);
+        var act = () => handler.Handle(new GetWalletBalanceQuery(WalletId.New(), UserId.New()), CancellationToken.None);
+
+        await act.Should().ThrowAsync<WalletNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_caller_does_not_own_the_wallet()
+    {
+        var wallet = new Wallet(WalletId.New(), UserId.New(), Usd);
+        _wallets.Setup(x => x.GetByIdAsync(wallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(wallet);
+        var handler = new GetWalletBalanceQueryHandler(_wallets.Object);
+
+        var act = () => handler.Handle(new GetWalletBalanceQuery(wallet.Id, UserId.New()), CancellationToken.None);
 
         await act.Should().ThrowAsync<WalletNotFoundException>();
     }

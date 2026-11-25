@@ -43,6 +43,14 @@ public sealed class CreateTransferCommandHandler : IRequestHandler<CreateTransfe
         var sourceWallet = await _wallets.GetByIdAsync(request.SourceWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.SourceWalletId);
 
+        // Same 404 whether the source wallet doesn't exist or simply isn't the
+        // caller's - closes a theft primitive where any authenticated customer could
+        // debit any other customer's wallet just by knowing its id. The target wallet
+        // is deliberately left unchecked - it's the recipient's wallet, shared like an
+        // account number, and this is how a transfer legitimately reaches someone else.
+        if (sourceWallet.OwnerId != request.CallerId)
+            throw new WalletNotFoundException(request.SourceWalletId);
+
         var targetWallet = await _wallets.GetByIdAsync(request.TargetWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.TargetWalletId);
 

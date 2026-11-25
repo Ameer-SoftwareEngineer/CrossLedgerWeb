@@ -15,6 +15,7 @@ public sealed record ManualTransferCommand(
     WalletId TargetWalletId,
     decimal SourceAmount,
     decimal TargetAmount,
+    UserId AdminUserId,
     string IdempotencyKey) : IRequest<ManualTransferCommandResult>, IIdempotentRequest;
 
 public sealed record ManualTransferCommandResult(TransferId TransferId, DateTimeOffset PostedAt);

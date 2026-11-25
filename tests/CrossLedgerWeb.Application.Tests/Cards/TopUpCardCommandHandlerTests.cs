@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Cards;
+using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Cards;
 using CrossLedgerWeb.Domain.Exceptions;
 using CrossLedgerWeb.Domain.Fx;
@@ -78,5 +79,20 @@ public class TopUpCardCommandHandlerTests
         result.NewCardBalance.Should().Be(100m);
         _cardWallet.Balance.Amount.Should().Be(100m);
         _sourceWallet.Balance.Amount.Should().Be(900m);
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_caller_does_not_own_the_funding_wallet()
+    {
+        var someoneElsesWallet = new Wallet(WalletId.New(), UserId.New(), Usd);
+        someoneElsesWallet.Credit(new Money(1000m, Usd), TransferId.New(), Now);
+        _wallets.Setup(x => x.GetByIdAsync(someoneElsesWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(someoneElsesWallet);
+        _card.Approve();
+        var handler = CreateHandler();
+        var command = ValidCommand() with { SourceWalletId = someoneElsesWallet.Id };
+
+        var act = () => handler.Handle(command, CancellationToken.None);
+
+        await act.Should().ThrowAsync<WalletNotFoundException>();
     }
 }

@@ -25,17 +25,26 @@ public sealed class WalletsController : ControllerBase
     [ProducesResponseType<CreateWalletResponse>(StatusCodes.Status201Created)]
     public async Task<ActionResult<CreateWalletResponse>> Create(CreateWalletRequest request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new CreateWalletCommand(new UserId(request.OwnerId), request.Currency), cancellationToken);
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var result = await _mediator.Send(new CreateWalletCommand(userId, request.Currency), cancellationToken);
 
         var response = new CreateWalletResponse(result.WalletId.Value, result.OwnerId.Value, result.Currency.Code);
         return CreatedAtAction(nameof(GetBalance), new { walletId = response.WalletId }, response);
     }
 
+    /// <summary>404s for a wallet that exists but belongs to someone else, same as for
+    /// one that doesn't exist at all - same convention GetTransactions/GetStatement on
+    /// this controller already use.</summary>
     [HttpGet("{walletId:guid}/balance")]
     [ProducesResponseType<WalletBalanceResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<WalletBalanceResponse>> GetBalance(Guid walletId, CancellationToken cancellationToken)
     {
-        var balance = await _mediator.Send(new GetWalletBalanceQuery(new WalletId(walletId)), cancellationToken);
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var balance = await _mediator.Send(new GetWalletBalanceQuery(new WalletId(walletId), userId), cancellationToken);
 
         return Ok(new WalletBalanceResponse(walletId, balance.Amount, balance.Currency.Code));
     }

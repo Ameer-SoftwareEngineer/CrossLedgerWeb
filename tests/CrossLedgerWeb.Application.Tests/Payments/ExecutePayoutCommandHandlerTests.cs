@@ -59,7 +59,7 @@ public class ExecutePayoutCommandHandlerTests
         _clock.Object);
 
     private ExecutePayoutCommand ValidCommand(decimal amount = 100m) => new(
-        _sourceWallet.Id, "EUR", "DE", amount, RoutingPreference.Standard, "idem-key-1");
+        _sourceWallet.Id, "EUR", "DE", amount, RoutingPreference.Standard, _sourceWallet.OwnerId, "idem-key-1");
 
     [Fact]
     public async Task Handle_reserves_funds_and_marks_the_payout_processing_when_the_primary_provider_accepts()
@@ -132,6 +132,19 @@ public class ExecutePayoutCommandHandlerTests
         var act = () => handler.Handle(ValidCommand(), CancellationToken.None);
 
         await act.Should().ThrowAsync<WalletNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_throws_when_the_caller_does_not_own_the_source_wallet()
+    {
+        var provider = Provider(ProviderCode.Simulated, new PayoutResult(ProviderCode.Simulated, PayoutOutcome.Accepted, "ref", null));
+        var handler = CreateHandler(provider.Object);
+        var command = ValidCommand() with { CallerId = UserId.New() };
+
+        var act = () => handler.Handle(command, CancellationToken.None);
+
+        await act.Should().ThrowAsync<WalletNotFoundException>();
+        provider.Verify(x => x.ExecuteAsync(It.IsAny<PayoutRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

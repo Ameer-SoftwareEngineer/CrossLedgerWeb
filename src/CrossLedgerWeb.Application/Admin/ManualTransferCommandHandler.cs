@@ -1,5 +1,6 @@
 using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Exceptions;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using MediatR;
 
@@ -10,17 +11,23 @@ public sealed class ManualTransferCommandHandler : IRequestHandler<ManualTransfe
     private readonly IWalletRepository _wallets;
     private readonly IFxSettlementWalletResolver _fxSettlementWallets;
     private readonly IManualTransferPoster _poster;
+    private readonly ISecurityAuditLogRepository _auditLog;
+    private readonly IRequestContextAccessor _requestContext;
     private readonly IClock _clock;
 
     public ManualTransferCommandHandler(
         IWalletRepository wallets,
         IFxSettlementWalletResolver fxSettlementWallets,
         IManualTransferPoster poster,
+        ISecurityAuditLogRepository auditLog,
+        IRequestContextAccessor requestContext,
         IClock clock)
     {
         _wallets = wallets;
         _fxSettlementWallets = fxSettlementWallets;
         _poster = poster;
+        _auditLog = auditLog;
+        _requestContext = requestContext;
         _clock = clock;
     }
 
@@ -49,6 +56,14 @@ public sealed class ManualTransferCommandHandler : IRequestHandler<ManualTransfe
             request.TargetAmount,
             targetOwnership.Currency,
             now,
+            cancellationToken);
+
+        await _auditLog.RecordAsync(
+            new SecurityAuditEvent(
+                SecurityAuditEventId.New(), request.AdminUserId,
+                $"Posted manual transfer {result.TransferId}: {request.SourceAmount} {sourceOwnership.Currency.Code} -> {request.TargetAmount} {targetOwnership.Currency.Code}",
+                SecurityEventType.ManualTransferPosted, succeeded: true, failureReason: null,
+                _requestContext.IpAddress, _requestContext.UserAgent, now),
             cancellationToken);
 
         return new ManualTransferCommandResult(result.TransferId, result.PostedAt);

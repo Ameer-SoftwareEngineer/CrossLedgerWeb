@@ -19,6 +19,13 @@ public sealed class GetWalletBalanceQueryHandler : IRequestHandler<GetWalletBala
         var wallet = await _wallets.GetByIdAsync(request.WalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.WalletId);
 
+        // Same 404 whether the wallet doesn't exist or simply isn't the caller's,
+        // matching GetTransactionHistoryQueryHandler/GetAccountStatementQueryHandler on
+        // the same controller - without this, any authenticated customer could read any
+        // other customer's wallet balance by guessing/learning its id.
+        if (wallet.OwnerId != request.CallerId)
+            throw new WalletNotFoundException(request.WalletId);
+
         return wallet.Balance;
     }
 }

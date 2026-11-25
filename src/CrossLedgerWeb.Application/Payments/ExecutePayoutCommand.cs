@@ -11,6 +11,7 @@ public sealed record ExecutePayoutCommand(
     string DestinationCountry,
     decimal Amount,
     RoutingPreference Preference,
+    UserId CallerId,
     string IdempotencyKey) : IRequest<ExecutePayoutResult>, IIdempotentRequest;
 
 public sealed record ExecutePayoutResult(

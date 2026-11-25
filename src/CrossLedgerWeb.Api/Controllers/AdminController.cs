@@ -1,3 +1,4 @@
+using CrossLedgerWeb.Api.Security;
 using CrossLedgerWeb.Application.Admin;
 using CrossLedgerWeb.Application.Auth;
 using CrossLedgerWeb.Domain.Cards;
@@ -7,6 +8,7 @@ using CrossLedgerWeb.Shared.Cards;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CrossLedgerWeb.Api.Controllers;
 
@@ -17,6 +19,7 @@ namespace CrossLedgerWeb.Api.Controllers;
 [ApiController]
 [Route("api/v1/admin")]
 [Authorize(Roles = Roles.Admin)]
+[EnableRateLimiting(RateLimiterPolicies.AdminAction)]
 public sealed class AdminController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -42,7 +45,10 @@ public sealed class AdminController : ControllerBase
     [HttpPut("users/{userId:guid}/roles")]
     public async Task<IActionResult> SetUserRoles(Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new SetUserRolesCommand(new UserId(userId), request.Roles), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new SetUserRolesCommand(new UserId(userId), request.Roles, adminUserId), cancellationToken);
         return NoContent();
     }
 
@@ -74,14 +80,20 @@ public sealed class AdminController : ControllerBase
     [HttpPost("registrations/{userId:guid}/approve")]
     public async Task<IActionResult> ApproveRegistration(Guid userId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new ApproveRegistrationCommand(new UserId(userId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new ApproveRegistrationCommand(new UserId(userId), adminUserId), cancellationToken);
         return NoContent();
     }
 
     [HttpPost("registrations/{userId:guid}/reject")]
     public async Task<IActionResult> RejectRegistration(Guid userId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new RejectRegistrationCommand(new UserId(userId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new RejectRegistrationCommand(new UserId(userId), adminUserId), cancellationToken);
         return NoContent();
     }
 
@@ -104,14 +116,20 @@ public sealed class AdminController : ControllerBase
     [HttpPost("card-requests/{cardId:guid}/approve")]
     public async Task<IActionResult> ApproveCardRequest(Guid cardId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new ApproveCardRequestCommand(new CardId(cardId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new ApproveCardRequestCommand(new CardId(cardId), adminUserId), cancellationToken);
         return NoContent();
     }
 
     [HttpPost("card-requests/{cardId:guid}/reject")]
     public async Task<IActionResult> RejectCardRequest(Guid cardId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new RejectCardRequestCommand(new CardId(cardId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new RejectCardRequestCommand(new CardId(cardId), adminUserId), cancellationToken);
         return NoContent();
     }
 
@@ -138,14 +156,20 @@ public sealed class AdminController : ControllerBase
     [HttpPost("cards/{cardId:guid}/ship")]
     public async Task<IActionResult> MarkCardShipped(Guid cardId, MarkCardShippedRequest request, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new MarkCardShippedCommand(new CardId(cardId), request.Carrier, request.TrackingNumber), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new MarkCardShippedCommand(new CardId(cardId), request.Carrier, request.TrackingNumber, adminUserId), cancellationToken);
         return NoContent();
     }
 
     [HttpPost("cards/{cardId:guid}/deliver")]
     public async Task<IActionResult> MarkCardDelivered(Guid cardId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new MarkCardDeliveredCommand(new CardId(cardId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new MarkCardDeliveredCommand(new CardId(cardId), adminUserId), cancellationToken);
         return NoContent();
     }
 
@@ -174,7 +198,10 @@ public sealed class AdminController : ControllerBase
     [HttpPost("cards/authorizations/{cardAuthorizationId:guid}/resolve-manual-review")]
     public async Task<IActionResult> ResolveCardAuthorizationManualReview(Guid cardAuthorizationId, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new ResolveCardAuthorizationManualReviewCommand(new CardAuthorizationId(cardAuthorizationId)), cancellationToken);
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
+        await _mediator.Send(new ResolveCardAuthorizationManualReviewCommand(new CardAuthorizationId(cardAuthorizationId), adminUserId), cancellationToken);
         return NoContent();
     }
 
@@ -277,10 +304,13 @@ public sealed class AdminController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (!User.TryGetUserId(out var adminUserId))
+            return Unauthorized();
+
         var result = await _mediator.Send(
             new ManualTransferCommand(
                 new WalletId(request.SourceWalletId), new WalletId(request.TargetWalletId),
-                request.SourceAmount, request.TargetAmount, idempotencyKey),
+                request.SourceAmount, request.TargetAmount, adminUserId, idempotencyKey),
             cancellationToken);
 
         return Ok(new ManualTransferResponse(result.TransferId.Value, result.PostedAt));

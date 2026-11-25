@@ -104,6 +104,19 @@ public class AcceptOtcRequestCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_throws_when_the_caller_does_not_own_the_target_wallet()
+    {
+        var someoneElsesWallet = new Wallet(WalletId.New(), UserId.New(), Pkr);
+        _wallets.Setup(x => x.GetByIdAsync(someoneElsesWallet.Id, It.IsAny<CancellationToken>())).ReturnsAsync(someoneElsesWallet);
+        var handler = CreateHandler();
+        var command = ValidCommand() with { TargetWalletId = someoneElsesWallet.Id };
+
+        var act = () => handler.Handle(command, CancellationToken.None);
+
+        await act.Should().ThrowAsync<WalletNotFoundException>();
+    }
+
+    [Fact]
     public async Task Handle_propagates_quote_expired_once_the_offer_window_has_passed()
     {
         _clock.Setup(x => x.UtcNow).Returns(_quote.ExpiresAt.AddSeconds(1));

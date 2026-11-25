@@ -51,6 +51,13 @@ public sealed class ExecutePayoutCommandHandler : IRequestHandler<ExecutePayoutC
         var sourceWallet = await _wallets.GetByIdAsync(request.SourceWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.SourceWalletId);
 
+        // Same 404 whether the source wallet doesn't exist or simply isn't the
+        // caller's - a payout's destination is an external bank account, so an
+        // unchecked source wallet here would let any customer drain another
+        // customer's wallet straight off the platform.
+        if (sourceWallet.OwnerId != request.CallerId)
+            throw new WalletNotFoundException(request.SourceWalletId);
+
         var targetCurrency = Currency.From(request.TargetCurrencyCode);
         var corridor = new Corridor(sourceWallet.Currency, targetCurrency, request.DestinationCountry);
         var amount = new Money(request.Amount, sourceWallet.Currency);

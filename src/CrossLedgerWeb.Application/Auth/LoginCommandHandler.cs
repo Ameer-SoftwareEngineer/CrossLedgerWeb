@@ -42,10 +42,17 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginCha
     {
         var validation = await _identity.ValidateCredentialsAsync(request.Email, request.Password, cancellationToken);
 
+        // Both branches below throw the SAME InvalidCredentialsException (401) rather than
+        // a distinguishing AccountLockedException (423) - a real account locks out after 5
+        // wrong attempts while a nonexistent email never does, so returning a different
+        // status for "locked" vs. "wrong password" would let an attacker enumerate which
+        // candidate emails are real accounts just by sending 5 guesses and watching the
+        // response change. The audit log (internal-only, Admin Console's Security Events
+        // tab) still records the real reason - only the thing the caller sees is collapsed.
         if (validation.IsLockedOut)
         {
             await RecordAsync(validation.UserId, request.Email, succeeded: false, "AccountLocked", cancellationToken);
-            throw new AccountLockedException(request.Email);
+            throw new InvalidCredentialsException();
         }
 
         if (!validation.Succeeded)

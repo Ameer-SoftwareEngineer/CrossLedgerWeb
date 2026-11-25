@@ -129,6 +129,30 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0,
         });
     });
+    options.AddPolicy(RateLimiterPolicies.LoginAttempt, httpContext =>
+    {
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0,
+        });
+    });
+    options.AddPolicy(RateLimiterPolicies.AdminAction, httpContext =>
+    {
+        var partitionKey = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        });
+    });
 });
 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();

@@ -24,7 +24,7 @@ public class StripeProviderTests
     {
         var provider = CreateProvider();
         const string payload = "{\"type\":\"charge.succeeded\"}";
-        var header = BuildStripeSignatureHeader(payload, "whsec_test", 1893456000);
+        var header = BuildStripeSignatureHeader(payload, "whsec_test", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         provider.VerifySignature(payload, header, "whsec_test").Should().BeTrue();
     }
@@ -37,7 +37,18 @@ public class StripeProviderTests
         // A naive HMAC over just the payload (like the other providers use) rather than
         // "{timestamp}.{payload}" - must NOT verify against Stripe's actual scheme.
         var bareSignature = HmacSignatureVerifier.Sign(payload, "whsec_test");
-        var header = $"t=1893456000,v1={bareSignature}";
+        var header = $"t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()},v1={bareSignature}";
+
+        provider.VerifySignature(payload, header, "whsec_test").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rejects_a_correctly_signed_header_whose_timestamp_is_outside_the_tolerance_window()
+    {
+        var provider = CreateProvider();
+        const string payload = "{\"type\":\"charge.succeeded\"}";
+        var staleTimestamp = DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds();
+        var header = BuildStripeSignatureHeader(payload, "whsec_test", staleTimestamp);
 
         provider.VerifySignature(payload, header, "whsec_test").Should().BeFalse();
     }

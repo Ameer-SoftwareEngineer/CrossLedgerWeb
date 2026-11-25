@@ -2,6 +2,7 @@ using CrossLedgerWeb.Application.Abstractions;
 using CrossLedgerWeb.Application.Admin;
 using CrossLedgerWeb.Application.Exceptions;
 using CrossLedgerWeb.Domain.Cards;
+using CrossLedgerWeb.Domain.Security;
 using CrossLedgerWeb.Domain.ValueObjects;
 using FluentAssertions;
 using Moq;
@@ -13,8 +14,11 @@ public class MarkCardDeliveredCommandHandlerTests
     private static readonly Currency Usd = Currency.From("USD");
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly CardAddress TestAddress = new("123 Main St", "4B", "CA", "90001", "Los Angeles", "US");
+    private static readonly UserId AdminUserId = UserId.New();
 
     private readonly Mock<ICardRepository> _cards = new();
+    private readonly Mock<ISecurityAuditLogRepository> _auditLog = new();
+    private readonly Mock<IRequestContextAccessor> _requestContext = new();
     private readonly Mock<IClock> _clock = new();
 
     public MarkCardDeliveredCommandHandlerTests() => _clock.Setup(x => x.UtcNow).Returns(Now);
@@ -29,7 +33,7 @@ public class MarkCardDeliveredCommandHandlerTests
         return card;
     }
 
-    private MarkCardDeliveredCommandHandler CreateHandler() => new(_cards.Object, _clock.Object);
+    private MarkCardDeliveredCommandHandler CreateHandler() => new(_cards.Object, _auditLog.Object, _requestContext.Object, _clock.Object);
 
     [Fact]
     public async Task Handle_marks_the_card_delivered()
@@ -37,10 +41,13 @@ public class MarkCardDeliveredCommandHandlerTests
         var card = NewShippedPhysicalCard();
         _cards.Setup(x => x.GetByIdAsync(card.Id, It.IsAny<CancellationToken>())).ReturnsAsync(card);
 
-        await CreateHandler().Handle(new MarkCardDeliveredCommand(card.Id), CancellationToken.None);
+        await CreateHandler().Handle(new MarkCardDeliveredCommand(card.Id, AdminUserId), CancellationToken.None);
 
         card.FulfillmentStatus.Should().Be(CardFulfillmentStatus.Delivered);
         card.DeliveredAt.Should().Be(Now);
+        _auditLog.Verify(x => x.RecordAsync(
+            It.Is<SecurityAuditEvent>(e => e.UserId == AdminUserId && e.EventType == SecurityEventType.CardMarkedDelivered && e.Succeeded),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -48,7 +55,7 @@ public class MarkCardDeliveredCommandHandlerTests
     {
         _cards.Setup(x => x.GetByIdAsync(It.IsAny<CardId>(), It.IsAny<CancellationToken>())).ReturnsAsync((Card?)null);
 
-        var act = () => CreateHandler().Handle(new MarkCardDeliveredCommand(CardId.New()), CancellationToken.None);
+        var act = () => CreateHandler().Handle(new MarkCardDeliveredCommand(CardId.New(), AdminUserId), CancellationToken.None);
 
         await act.Should().ThrowAsync<CardNotFoundException>();
     }

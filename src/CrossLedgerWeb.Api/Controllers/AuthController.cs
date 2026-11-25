@@ -59,6 +59,7 @@ public sealed class AuthController : ControllerBase
     /// mandatory (specification 9), so this always returns a short-lived challenge that
     /// TwoFactorController's login/* endpoints consume to actually finish signing in.</summary>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimiterPolicies.LoginAttempt)]
     [ProducesResponseType<LoginChallengeResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<LoginChallengeResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
     {

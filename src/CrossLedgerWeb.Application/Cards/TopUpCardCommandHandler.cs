@@ -44,6 +44,12 @@ public sealed class TopUpCardCommandHandler : IRequestHandler<TopUpCardCommand, 
         var sourceWallet = await _wallets.GetByIdAsync(request.SourceWalletId, cancellationToken)
             ?? throw new WalletNotFoundException(request.SourceWalletId);
 
+        // Same 404 whether the funding wallet doesn't exist or simply isn't the
+        // caller's - without this, anyone could fund their own card using another
+        // customer's wallet as the source.
+        if (sourceWallet.OwnerId != request.CallerId)
+            throw new WalletNotFoundException(request.SourceWalletId);
+
         var amount = new Money(request.Amount, card.Currency);
         var now = _clock.UtcNow;
         var transferId = TransferId.New();
